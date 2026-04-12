@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SecurityRecap.Api/SecurityRecap.Api.csproj" />
+    <Project Path="src/SecurityRecap.Core/SecurityRecap.Core.csproj" />
+    <Project Path="src/SecurityRecap.Infrastructure/SecurityRecap.Infrastructure.csproj" />
+  </Folder>
+</Solution>
