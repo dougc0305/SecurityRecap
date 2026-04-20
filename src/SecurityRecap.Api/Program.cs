@@ -41,12 +41,16 @@ if (string.IsNullOrWhiteSpace(jwtSecret))
 
 builder.Services.AddAuthentication(options =>
     {
-        options.DefaultScheme = "JwtOrApiKey";
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
         options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
     })
     .AddJwtBearer(options =>
     {
         options.MapInboundClaims = false;
+        options.ForwardDefaultSelector = ctx =>
+            ctx.Request.Headers.ContainsKey(ApiKeyAuthenticationHandler.HeaderName)
+                ? ApiKeyAuthenticationHandler.SchemeName
+                : null;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -61,14 +65,7 @@ builder.Services.AddAuthentication(options =>
         };
     })
     .AddScheme<ApiKeyAuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
-        ApiKeyAuthenticationHandler.SchemeName, _ => { })
-    .AddPolicyScheme("JwtOrApiKey", "JWT bearer or X-Api-Key", options =>
-    {
-        options.ForwardDefaultSelector = ctx =>
-            ctx.Request.Headers.ContainsKey(ApiKeyAuthenticationHandler.HeaderName)
-                ? ApiKeyAuthenticationHandler.SchemeName
-                : JwtBearerDefaults.AuthenticationScheme;
-    });
+        ApiKeyAuthenticationHandler.SchemeName, _ => { });
 
 builder.Services.AddAuthorization(options =>
 {
