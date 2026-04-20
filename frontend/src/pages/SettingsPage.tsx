@@ -5,6 +5,7 @@ import { propertiesApi } from '../services/api';
 import { Plus } from 'lucide-react';
 import { formatRoleLabel, isAdmin } from '../utils/authorization';
 import { UsersSection } from '../components/UsersSection';
+import { ApiKeysSection } from '../components/ApiKeysSection';
 import { Link } from 'react-router-dom';
 
 export function SettingsPage() {
@@ -64,6 +65,7 @@ export function SettingsPage() {
       </div>
 
       {canManageProperties && <UsersSection />}
+      {canManageProperties && <ApiKeysSection />}
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>

@@ -4,6 +4,7 @@ import type {
   Property, Report, Incident, Vehicle, AddressOfInterest, ChatRequest, ChatResponse,
   ManagedUser, CreateUserRequest, CreateUserResponse, UpdateUserRequest,
   ResetPasswordResponse, ChangePasswordRequest,
+  ApiKey, CreateApiKeyRequest, CreateApiKeyResponse,
 } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5069/api';
@@ -61,6 +62,16 @@ export const authApi = {
     api.post<ApiResponse<LoginResponse>>('/auth/refresh', { refreshToken }),
   changePassword: (data: ChangePasswordRequest) =>
     api.post<ApiResponse<{ changed: boolean }>>('/auth/change-password', data),
+};
+
+// API Keys (admin-only)
+export const apiKeysApi = {
+  getAll: () =>
+    api.get<ApiResponse<ApiKey[]>>('/v1/api-keys'),
+  create: (data: CreateApiKeyRequest) =>
+    api.post<ApiResponse<CreateApiKeyResponse>>('/v1/api-keys', data),
+  revoke: (id: string) =>
+    api.post<ApiResponse<{ revoked: boolean }>>(`/v1/api-keys/${id}/revoke`),
 };
 
 // Users (admin-only)

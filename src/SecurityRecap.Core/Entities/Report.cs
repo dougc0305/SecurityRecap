@@ -11,6 +11,7 @@ public class Report
     public string? MdSummaryUrl { get; set; }
     public string? AiSummaryHtml { get; set; }
     public string[] OfficerNames { get; set; } = Array.Empty<string>();
+    public string? ExternalId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public Property Property { get; set; } = null!;

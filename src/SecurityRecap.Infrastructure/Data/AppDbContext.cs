@@ -20,6 +20,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<UserProperty> UserProperties => Set<UserProperty>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<ServiceAssignment> ServiceAssignments => Set<ServiceAssignment>();
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -65,6 +66,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             e.Property(r => r.Id).HasDefaultValueSql("gen_random_uuid()");
             e.HasOne(r => r.Property).WithMany(p => p.Reports).HasForeignKey(r => r.PropertyId);
             e.Property(r => r.CreatedAt).HasDefaultValueSql("now()");
+            e.HasIndex(r => new { r.PropertyId, r.ExternalId })
+                .IsUnique()
+                .HasFilter("external_id IS NOT NULL");
         });
 
         // Incident
@@ -131,6 +135,17 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             e.HasOne(rt => rt.User).WithMany().HasForeignKey(rt => rt.UserId);
             e.HasIndex(rt => rt.Token).IsUnique();
             e.Property(rt => rt.CreatedAt).HasDefaultValueSql("now()");
+        });
+
+        // ApiKey (tenant-scoped integration credential)
+        builder.Entity<ApiKey>(e =>
+        {
+            e.HasKey(a => a.Id);
+            e.Property(a => a.Id).HasDefaultValueSql("gen_random_uuid()");
+            e.HasOne(a => a.Tenant).WithMany().HasForeignKey(a => a.TenantId);
+            e.HasIndex(a => a.KeyHash).IsUnique();
+            e.HasIndex(a => a.TenantId);
+            e.Property(a => a.CreatedAt).HasDefaultValueSql("now()");
         });
 
         // ServiceAssignment (cross-tenant property visibility for management/security companies)

@@ -28,13 +28,36 @@ public class IngestionService : IIngestionService
         _logger = logger;
     }
 
-    public async Task<Guid> IngestReportAsync(Guid tenantId, Guid userId, UserRole userRole, Guid propertyId, Stream pdfStream, string fileName)
+    public async Task<IngestionOutcome> IngestReportAsync(
+        Guid tenantId,
+        Guid userId,
+        UserRole userRole,
+        Guid propertyId,
+        Stream pdfStream,
+        string fileName,
+        string? externalId = null)
     {
         // Verify property belongs to tenant
         var property = await _db.Properties
             .ApplyPropertyAccess(tenantId, userId, userRole)
             .FirstOrDefaultAsync(p => p.Id == propertyId)
             ?? throw new KeyNotFoundException($"Property {propertyId} not found for tenant");
+
+        // Idempotency: short-circuit if this externalId has already been ingested for this property
+        if (!string.IsNullOrWhiteSpace(externalId))
+        {
+            var existing = await _db.Reports
+                .Where(r => r.PropertyId == propertyId && r.ExternalId == externalId)
+                .Select(r => r.Id)
+                .FirstOrDefaultAsync();
+            if (existing != Guid.Empty)
+            {
+                _logger.LogInformation(
+                    "Skipping ingest; report {ReportId} already exists for property {PropertyId} externalId {ExternalId}",
+                    existing, propertyId, externalId);
+                return new IngestionOutcome(existing, AlreadyIngested: true);
+            }
+        }
 
         // Read PDF into memory (needed for both blob upload and Claude API)
         using var memoryStream = new MemoryStream();
@@ -102,6 +125,7 @@ public class IngestionService : IIngestionService
             PeriodEnd = TryParseDateTime(result.PeriodEnd),
             RawPdfUrl = pdfUrl,
             AiSummaryHtml = result.HtmlSummary,
+            ExternalId = string.IsNullOrWhiteSpace(externalId) ? null : externalId,
             OfficerNames = result.Incidents
                 .Where(i => !string.IsNullOrWhiteSpace(i.OfficerName))
                 .Select(i => i.OfficerName!)
@@ -236,7 +260,7 @@ public class IngestionService : IIngestionService
             "Ingested report {ReportId}: {IncidentCount} incidents, {VehicleCount} vehicles, {AddressCount} addresses",
             report.Id, result.Incidents.Count, result.Vehicles.Count, incidentsByAddress.Count());
 
-        return report.Id;
+        return new IngestionOutcome(report.Id, AlreadyIngested: false);
     }
 
     private static string StripCodeFences(string text)

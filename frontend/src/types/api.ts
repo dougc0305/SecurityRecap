@@ -70,6 +70,24 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
+export interface ApiKey {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface CreateApiKeyRequest {
+  name: string;
+}
+
+export interface CreateApiKeyResponse {
+  apiKey: ApiKey;
+  rawKey: string;
+}
+
 export interface Property {
   id: string;
   name: string;

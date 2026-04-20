@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using SecurityRecap.Api.Auth;
 using SecurityRecap.Api.Services;
 using SecurityRecap.Core.Entities;
 using SecurityRecap.Core.Enums;
@@ -40,7 +41,7 @@ if (string.IsNullOrWhiteSpace(jwtSecret))
 
 builder.Services.AddAuthentication(options =>
     {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultScheme = "JwtOrApiKey";
         options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
     })
     .AddJwtBearer(options =>
@@ -58,6 +59,15 @@ builder.Services.AddAuthentication(options =>
             ValidAudience = builder.Configuration["Jwt:Audience"] ?? "SecurityRecap",
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
         };
+    })
+    .AddScheme<ApiKeyAuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
+        ApiKeyAuthenticationHandler.SchemeName, _ => { })
+    .AddPolicyScheme("JwtOrApiKey", "JWT bearer or X-Api-Key", options =>
+    {
+        options.ForwardDefaultSelector = ctx =>
+            ctx.Request.Headers.ContainsKey(ApiKeyAuthenticationHandler.HeaderName)
+                ? ApiKeyAuthenticationHandler.SchemeName
+                : JwtBearerDefaults.AuthenticationScheme;
     });
 
 builder.Services.AddAuthorization(options =>
@@ -74,6 +84,7 @@ builder.Services.AddAuthorization(options =>
 // Services
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
+builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 
 builder.Services.AddScoped<IPropertyService, PropertyService>();
 builder.Services.AddScoped<IBlobStorageService, LocalFileStorageService>();

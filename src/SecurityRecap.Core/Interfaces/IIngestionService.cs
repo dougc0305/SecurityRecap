@@ -2,7 +2,16 @@ namespace SecurityRecap.Core.Interfaces;
 
 using SecurityRecap.Core.Enums;
 
+public record IngestionOutcome(Guid ReportId, bool AlreadyIngested);
+
 public interface IIngestionService
 {
-    Task<Guid> IngestReportAsync(Guid tenantId, Guid userId, UserRole userRole, Guid propertyId, Stream pdfStream, string fileName);
+    Task<IngestionOutcome> IngestReportAsync(
+        Guid tenantId,
+        Guid userId,
+        UserRole userRole,
+        Guid propertyId,
+        Stream pdfStream,
+        string fileName,
+        string? externalId = null);
 }
