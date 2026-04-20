@@ -1,7 +1,9 @@
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using SecurityRecap.Core.Exceptions;
 using SecurityRecap.Core.Interfaces;
 
 namespace SecurityRecap.Infrastructure.Services;
@@ -72,15 +74,8 @@ public class ClaudeApiService : IClaudeApiService
 
         _logger.LogInformation("Sending PDF ({Size} bytes) to Claude API for analysis", pdfBytes.Length);
 
-        var response = await _httpClient.SendAsync(request);
-        var responseBody = await response.Content.ReadAsStringAsync();
-
-        if (!response.IsSuccessStatusCode)
-        {
-            _logger.LogError("Claude API error {StatusCode}: {Body}", response.StatusCode, responseBody);
-            throw new HttpRequestException($"Claude API returned {response.StatusCode}: {responseBody}");
-        }
-
+        var (responseBody, response) = await SendAsync(request);
+        EnsureSuccess(response, responseBody);
         return ExtractTextContent(responseBody);
     }
 
@@ -111,16 +106,77 @@ public class ClaudeApiService : IClaudeApiService
 
         _logger.LogInformation("Sending chat message to Claude API");
 
-        var response = await _httpClient.SendAsync(request);
-        var responseBody = await response.Content.ReadAsStringAsync();
+        var (responseBody, response) = await SendAsync(request);
+        EnsureSuccess(response, responseBody);
+        return ExtractTextContent(responseBody);
+    }
 
-        if (!response.IsSuccessStatusCode)
+    private async Task<(string body, HttpResponseMessage response)> SendAsync(HttpRequestMessage request)
+    {
+        try
         {
-            _logger.LogError("Claude API error {StatusCode}: {Body}", response.StatusCode, responseBody);
-            throw new HttpRequestException($"Claude API returned {response.StatusCode}: {responseBody}");
+            var response = await _httpClient.SendAsync(request);
+            var body = await response.Content.ReadAsStringAsync();
+            return (body, response);
+        }
+        catch (TaskCanceledException ex)
+        {
+            throw new ClaudeApiException(ClaudeFailureKind.Timeout, null, ex.Message, null, null, ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new ClaudeApiException(ClaudeFailureKind.Network, null, ex.Message, null, null, ex);
+        }
+    }
+
+    private void EnsureSuccess(HttpResponseMessage response, string body)
+    {
+        if (response.IsSuccessStatusCode) return;
+
+        string? type = null, message = null;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("error", out var err))
+            {
+                if (err.TryGetProperty("type", out var t)) type = t.GetString();
+                if (err.TryGetProperty("message", out var m)) message = m.GetString();
+            }
+        }
+        catch (JsonException)
+        {
+            // body wasn't JSON; fall through with nulls
         }
 
-        return ExtractTextContent(responseBody);
+        var requestId = response.Headers.TryGetValues("request-id", out var rid)
+            ? rid.FirstOrDefault()
+            : null;
+
+        var kind = ClassifyFailure(response.StatusCode, type, message);
+
+        _logger.LogError("Claude API error {StatusCode} kind={Kind} requestId={RequestId} type={Type} message={Message}",
+            response.StatusCode, kind, requestId, type, message);
+
+        throw new ClaudeApiException(kind, type, message, requestId, response.StatusCode);
+    }
+
+    private static ClaudeFailureKind ClassifyFailure(HttpStatusCode status, string? type, string? message)
+    {
+        if (!string.IsNullOrEmpty(message) &&
+            message.Contains("credit balance", StringComparison.OrdinalIgnoreCase))
+            return ClaudeFailureKind.Billing;
+
+        return status switch
+        {
+            HttpStatusCode.Unauthorized => ClaudeFailureKind.AuthenticationOrPermission,
+            HttpStatusCode.Forbidden => ClaudeFailureKind.AuthenticationOrPermission,
+            HttpStatusCode.TooManyRequests => ClaudeFailureKind.RateLimit,
+            HttpStatusCode.ServiceUnavailable => ClaudeFailureKind.Overloaded,
+            HttpStatusCode.BadGateway => ClaudeFailureKind.Overloaded,
+            HttpStatusCode.GatewayTimeout => ClaudeFailureKind.Timeout,
+            HttpStatusCode.BadRequest => ClaudeFailureKind.BadRequest,
+            _ => ClaudeFailureKind.Unknown
+        };
     }
 
     private static string ExtractTextContent(string responseBody)

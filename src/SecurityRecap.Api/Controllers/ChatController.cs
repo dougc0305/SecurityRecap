@@ -2,6 +2,8 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SecurityRecap.Api.DTOs;
+using SecurityRecap.Api.Services;
+using SecurityRecap.Core.Exceptions;
 using SecurityRecap.Core.Interfaces;
 
 namespace SecurityRecap.Api.Controllers;
@@ -54,6 +56,11 @@ public class ChatController : BaseApiController
         catch (KeyNotFoundException ex)
         {
             return NotFound(ApiResponse<ChatResponse>.Fail(ex.Message));
+        }
+        catch (ClaudeApiException ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                ApiResponse<ChatResponse>.Fail(ClaudeFailureFormatter.ToUserMessage(ex)));
         }
     }
 }

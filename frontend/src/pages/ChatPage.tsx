@@ -36,8 +36,12 @@ export function ChatPage() {
       if (res.data.success && res.data.data) {
         setMessages([...newMessages, { role: 'assistant', content: res.data.data.response }]);
       }
-    } catch (err) {
-      setMessages([...newMessages, { role: 'assistant', content: 'Sorry, something went wrong. Please try again.' }]);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } }; message?: string };
+      const friendly = e.response?.data?.error
+        ?? e.message
+        ?? 'Sorry, something went wrong. Please try again.';
+      setMessages([...newMessages, { role: 'assistant', content: friendly }]);
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SecurityRecap.Api.DTOs;
+using SecurityRecap.Api.Services;
+using SecurityRecap.Core.Exceptions;
 using SecurityRecap.Core.Interfaces;
 
 namespace SecurityRecap.Api.Controllers;
@@ -45,6 +47,11 @@ public class IngestController : BaseApiController
         catch (KeyNotFoundException ex)
         {
             return NotFound(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (ClaudeApiException ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                ApiResponse<object>.Fail(ClaudeFailureFormatter.ToUserMessage(ex)));
         }
     }
 }

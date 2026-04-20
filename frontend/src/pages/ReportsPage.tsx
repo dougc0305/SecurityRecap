@@ -45,8 +45,12 @@ export function ReportsPage() {
     try {
       await ingestApi.uploadReport(selectedPropertyId, file);
       fetchReports();
-    } catch (err) {
-      alert('Upload failed. Check console for details.');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } }; message?: string };
+      const friendly = e.response?.data?.error
+        ?? e.message
+        ?? 'Upload failed.';
+      alert(friendly);
       console.error(err);
     } finally {
       setUploading(false);
