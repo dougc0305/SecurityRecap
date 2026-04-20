@@ -134,6 +134,18 @@ if not exist "%EXTRACT_DIR%\client" (
 )
 
 REM =====================================================
+REM Preserve operator-managed files across deploys
+REM (these live on the server only, never in the artifact)
+REM =====================================================
+set "PRESERVE_DIR=%TEMP%\SecurityRecap_preserve_%DEPLOY_ID%"
+mkdir "%PRESERVE_DIR%" >nul 2>&1
+
+if exist "%DEPLOY_ROOT%\appsettings.Production.json" (
+  echo Preserving appsettings.Production.json...
+  copy /Y "%DEPLOY_ROOT%\appsettings.Production.json" "%PRESERVE_DIR%\appsettings.Production.json" >nul
+)
+
+REM =====================================================
 REM Backup current deployment
 REM =====================================================
 if exist "%DEPLOY_ROOT%" (
@@ -198,6 +210,15 @@ REM =====================================================
 if exist "%EXTRACT_DIR%\git_sha.txt" (
   copy /Y "%EXTRACT_DIR%\git_sha.txt" "%DEPLOY_ROOT%\git_sha.txt" >nul
 )
+
+REM =====================================================
+REM Restore preserved operator-managed files
+REM =====================================================
+if exist "%PRESERVE_DIR%\appsettings.Production.json" (
+  echo Restoring appsettings.Production.json...
+  copy /Y "%PRESERVE_DIR%\appsettings.Production.json" "%DEPLOY_ROOT%\appsettings.Production.json" >nul
+)
+rmdir /S /Q "%PRESERVE_DIR%" >nul 2>&1
 
 REM =====================================================
 REM Start IIS site
