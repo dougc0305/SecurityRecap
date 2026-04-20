@@ -16,7 +16,8 @@ public class ClaudeApiService : IClaudeApiService
     {
         _httpClient = httpClient;
         _apiKey = config["Anthropic:ApiKey"]
-            ?? throw new InvalidOperationException("Anthropic:ApiKey is not configured");
+            ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
+            ?? throw new InvalidOperationException("Anthropic API key not configured. Set Anthropic:ApiKey or ANTHROPIC_API_KEY env var.");
         _logger = logger;
     }
 
@@ -26,7 +27,7 @@ public class ClaudeApiService : IClaudeApiService
 
         var requestBody = new
         {
-            model = "claude-opus-4-5-20250514",
+            model = "claude-opus-4-5",
             max_tokens = 8192,
             system = systemPrompt,
             messages = new[]
@@ -93,7 +94,7 @@ public class ClaudeApiService : IClaudeApiService
 
         var requestBody = new
         {
-            model = "claude-sonnet-4-5-20250514",
+            model = "claude-sonnet-4-5",
             max_tokens = 4096,
             system = systemPrompt,
             messages = messageList

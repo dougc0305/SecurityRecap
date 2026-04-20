@@ -22,7 +22,9 @@ public class PropertiesController : BaseApiController
     public async Task<ActionResult<ApiResponse<IEnumerable<PropertyResponse>>>> GetAll()
     {
         var tenantId = GetTenantId();
-        var properties = await _propertyService.GetAllAsync(tenantId);
+        var userId = GetUserId();
+        var userRole = GetUserRole();
+        var properties = await _propertyService.GetAllAsync(tenantId, userId, userRole);
         var response = properties.Select(ToResponse);
         return Ok(ApiResponse<IEnumerable<PropertyResponse>>.Ok(response));
     }
@@ -31,12 +33,15 @@ public class PropertiesController : BaseApiController
     public async Task<ActionResult<ApiResponse<PropertyResponse>>> GetById(Guid id)
     {
         var tenantId = GetTenantId();
-        var property = await _propertyService.GetByIdAsync(tenantId, id);
+        var userId = GetUserId();
+        var userRole = GetUserRole();
+        var property = await _propertyService.GetByIdAsync(tenantId, userId, userRole, id);
         if (property is null) return NotFound(ApiResponse<PropertyResponse>.Fail("Property not found"));
         return Ok(ApiResponse<PropertyResponse>.Ok(ToResponse(property)));
     }
 
     [HttpPost]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<ApiResponse<PropertyResponse>>> Create([FromBody] CreatePropertyRequest request)
     {
         var tenantId = GetTenantId();
@@ -58,6 +63,7 @@ public class PropertiesController : BaseApiController
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<ApiResponse<PropertyResponse>>> Update(Guid id, [FromBody] UpdatePropertyRequest request)
     {
         var tenantId = GetTenantId();

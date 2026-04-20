@@ -4,6 +4,15 @@ namespace SecurityRecap.Api.DTOs;
 
 public class IngestionResult
 {
+    [JsonPropertyName("report_date")]
+    public string? ReportDate { get; set; }
+
+    [JsonPropertyName("period_start")]
+    public string? PeriodStart { get; set; }
+
+    [JsonPropertyName("period_end")]
+    public string? PeriodEnd { get; set; }
+
     [JsonPropertyName("incidents")]
     public List<IngestionIncident> Incidents { get; set; } = new();
 

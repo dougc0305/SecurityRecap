@@ -3,6 +3,7 @@ import { useProperties } from '../hooks/useProperties';
 import { useAuth } from '../hooks/useAuth';
 import { propertiesApi } from '../services/api';
 import { Plus } from 'lucide-react';
+import { formatRoleLabel, isAdmin } from '../utils/authorization';
 
 export function SettingsPage() {
   const { user } = useAuth();
@@ -19,8 +20,13 @@ export function SettingsPage() {
     reportEmail: '',
     timezone: 'America/New_York',
   });
+  const canManageProperties = isAdmin(user);
 
   const handleCreate = async () => {
+    if (!canManageProperties) {
+      return;
+    }
+
     setSaving(true);
     try {
       await propertiesApi.create(form);
@@ -48,19 +54,27 @@ export function SettingsPage() {
           <span style={{ color: 'var(--text-muted)' }}>Email</span>
           <span>{user?.email}</span>
           <span style={{ color: 'var(--text-muted)' }}>Role</span>
-          <span style={{ textTransform: 'capitalize' }}>{user?.role}</span>
+          <span>{formatRoleLabel(user?.role)}</span>
         </div>
       </div>
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h2 style={{ fontSize: 16 }}>Properties</h2>
-          <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-            <Plus size={16} /> Add Property
-          </button>
+          {canManageProperties && (
+            <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+              <Plus size={16} /> Add Property
+            </button>
+          )}
         </div>
 
-        {showForm && (
+        {!canManageProperties && (
+          <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
+            Property creation and updates are limited to system administrators.
+          </p>
+        )}
+
+        {canManageProperties && showForm && (
           <div style={{
             background: 'var(--bg-primary)',
             border: '1px solid var(--border)',

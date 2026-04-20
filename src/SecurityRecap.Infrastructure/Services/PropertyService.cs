@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SecurityRecap.Core.Entities;
+using SecurityRecap.Core.Enums;
 using SecurityRecap.Core.Interfaces;
 using SecurityRecap.Infrastructure.Data;
 
@@ -14,20 +15,21 @@ public class PropertyService : IPropertyService
         _db = db;
     }
 
-    public async Task<IEnumerable<Property>> GetAllAsync(Guid tenantId)
+    public async Task<IEnumerable<Property>> GetAllAsync(Guid tenantId, Guid userId, UserRole userRole)
     {
         return await _db.Properties
-            .Where(p => p.TenantId == tenantId)
+            .ApplyPropertyAccess(tenantId, userId, userRole)
             .OrderBy(p => p.Name)
             .AsNoTracking()
             .ToListAsync();
     }
 
-    public async Task<Property?> GetByIdAsync(Guid tenantId, Guid id)
+    public async Task<Property?> GetByIdAsync(Guid tenantId, Guid userId, UserRole userRole, Guid id)
     {
         return await _db.Properties
+            .ApplyPropertyAccess(tenantId, userId, userRole)
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
+            .FirstOrDefaultAsync(p => p.Id == id);
     }
 
     public async Task<Property> CreateAsync(Guid tenantId, Property property)

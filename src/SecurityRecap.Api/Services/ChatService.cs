@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SecurityRecap.Api.Prompts;
+using SecurityRecap.Core.Enums;
 using SecurityRecap.Core.Interfaces;
 using SecurityRecap.Infrastructure.Data;
 
@@ -20,12 +21,13 @@ public class ChatService : IChatService
     }
 
     public async Task<string> SendMessageAsync(
-        Guid tenantId, Guid propertyId, string message,
+        Guid tenantId, Guid userId, UserRole userRole, Guid propertyId, string message,
         IEnumerable<ChatMessage>? conversationHistory)
     {
         // Verify property belongs to tenant
         var propertyExists = await _db.Properties
-            .AnyAsync(p => p.Id == propertyId && p.TenantId == tenantId);
+            .ApplyPropertyAccess(tenantId, userId, userRole)
+            .AnyAsync(p => p.Id == propertyId);
         if (!propertyExists)
             throw new KeyNotFoundException($"Property {propertyId} not found for tenant");
 

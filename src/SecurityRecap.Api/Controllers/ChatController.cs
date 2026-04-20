@@ -22,12 +22,33 @@ public class ChatController : BaseApiController
     public async Task<ActionResult<ApiResponse<ChatResponse>>> SendMessage([FromBody] ChatRequest request)
     {
         var tenantId = GetTenantId();
+        var userId = GetUserId();
+        var userRole = GetUserRole();
+
+        if (request.ConversationHistory is not null)
+        {
+            foreach (var item in request.ConversationHistory)
+            {
+                if (!string.Equals(item.Role, "user", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(item.Role, "assistant", StringComparison.OrdinalIgnoreCase))
+                {
+                    return BadRequest(ApiResponse<ChatResponse>.Fail("Conversation history contains an invalid role."));
+                }
+
+                if (string.IsNullOrWhiteSpace(item.Content))
+                    return BadRequest(ApiResponse<ChatResponse>.Fail("Conversation history contains an empty message."));
+            }
+        }
 
         try
         {
             var response = await _chatService.SendMessageAsync(
-                tenantId, request.PropertyId, request.Message,
-                request.ConversationHistory?.Select(h => new ChatMessage(h.Role, h.Content)));
+                tenantId,
+                userId,
+                userRole,
+                request.PropertyId,
+                request.Message,
+                request.ConversationHistory?.Select(h => new ChatMessage(h.Role.ToLowerInvariant(), h.Content)));
             return Ok(ApiResponse<ChatResponse>.Ok(new ChatResponse(response)));
         }
         catch (KeyNotFoundException ex)

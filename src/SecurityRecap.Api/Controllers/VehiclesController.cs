@@ -24,7 +24,9 @@ public class VehiclesController : BaseApiController
         [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
         var tenantId = GetTenantId();
-        var (items, totalCount) = await _vehicleService.GetAllAsync(tenantId, propertyId, plate, page, pageSize);
+        var userId = GetUserId();
+        var userRole = GetUserRole();
+        var (items, totalCount) = await _vehicleService.GetAllAsync(tenantId, userId, userRole, propertyId, plate, page, pageSize);
         return Ok(new PagedResponse<Vehicle> { Data = items, Page = page, PageSize = pageSize, TotalCount = totalCount });
     }
 
@@ -32,7 +34,9 @@ public class VehiclesController : BaseApiController
     public async Task<ActionResult<ApiResponse<Vehicle>>> GetById(Guid id)
     {
         var tenantId = GetTenantId();
-        var vehicle = await _vehicleService.GetByIdAsync(tenantId, id);
+        var userId = GetUserId();
+        var userRole = GetUserRole();
+        var vehicle = await _vehicleService.GetByIdAsync(tenantId, userId, userRole, id);
         if (vehicle is null) return NotFound(ApiResponse<Vehicle>.Fail("Vehicle not found"));
         return Ok(ApiResponse<Vehicle>.Ok(vehicle));
     }

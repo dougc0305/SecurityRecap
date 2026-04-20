@@ -1,8 +1,10 @@
 import axios from 'axios';
-import type { ApiResponse, LoginRequest, LoginResponse, PagedResponse, Property, Report, Incident, Vehicle, ChatRequest, ChatResponse } from '../types/api';
+import type { ApiResponse, LoginRequest, LoginResponse, PagedResponse, Property, Report, Incident, Vehicle, AddressOfInterest, ChatRequest, ChatResponse } from '../types/api';
+
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5069/api';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE,
 });
 
 // Request interceptor — attach JWT
@@ -24,7 +26,7 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {
         try {
-          const res = await axios.post<ApiResponse<LoginResponse>>('/api/auth/refresh', {
+          const res = await axios.post<ApiResponse<LoginResponse>>(`${API_BASE}/auth/refresh`, {
             refreshToken,
           });
           if (res.data.success && res.data.data) {
@@ -72,6 +74,8 @@ export const reportsApi = {
     api.get<PagedResponse<Report>>('/v1/reports', { params }),
   getById: (id: string) =>
     api.get<ApiResponse<Report>>(`/v1/reports/${id}`),
+  getPdfBlob: (id: string) =>
+    api.get<Blob>(`/v1/reports/${id}/pdf`, { responseType: 'blob' }),
 };
 
 // Incidents
@@ -93,6 +97,13 @@ export const vehiclesApi = {
     api.get<PagedResponse<Vehicle>>('/v1/vehicles', { params }),
   getById: (id: string) =>
     api.get<ApiResponse<Vehicle>>(`/v1/vehicles/${id}`),
+};
+
+export const addressesApi = {
+  getAll: (params: { propertyId?: string; page?: number; pageSize?: number }) =>
+    api.get<PagedResponse<AddressOfInterest>>('/v1/addresses', { params }),
+  getById: (id: string) =>
+    api.get<ApiResponse<{ address: AddressOfInterest; incidents: Incident[] }>>(`/v1/addresses/${id}`),
 };
 
 // Ingest

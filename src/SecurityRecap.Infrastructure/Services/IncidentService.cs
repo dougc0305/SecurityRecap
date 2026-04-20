@@ -16,12 +16,13 @@ public class IncidentService : IIncidentService
     }
 
     public async Task<(IEnumerable<Incident> Items, int TotalCount)> GetAllAsync(
-        Guid tenantId, Guid? propertyId, IncidentType? type, Severity? severity,
+        Guid tenantId, Guid userId, UserRole userRole, Guid? propertyId, IncidentType? type, Severity? severity,
         DateTime? from, DateTime? to, int page, int pageSize)
     {
+        var accessiblePropertyIds = _db.AccessiblePropertyIds(tenantId, userId, userRole);
+
         var query = _db.Incidents
-            .Include(i => i.Property)
-            .Where(i => i.Property.TenantId == tenantId);
+            .Where(i => accessiblePropertyIds.Contains(i.PropertyId));
 
         if (propertyId.HasValue)
             query = query.Where(i => i.PropertyId == propertyId.Value);

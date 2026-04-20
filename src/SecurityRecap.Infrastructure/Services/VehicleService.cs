@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SecurityRecap.Core.Entities;
+using SecurityRecap.Core.Enums;
 using SecurityRecap.Core.Interfaces;
 using SecurityRecap.Infrastructure.Data;
 
@@ -15,11 +16,12 @@ public class VehicleService : IVehicleService
     }
 
     public async Task<(IEnumerable<Vehicle> Items, int TotalCount)> GetAllAsync(
-        Guid tenantId, Guid? propertyId, string? plate, int page, int pageSize)
+        Guid tenantId, Guid userId, UserRole userRole, Guid? propertyId, string? plate, int page, int pageSize)
     {
+        var accessiblePropertyIds = _db.AccessiblePropertyIds(tenantId, userId, userRole);
+
         var query = _db.Vehicles
-            .Include(v => v.Property)
-            .Where(v => v.Property.TenantId == tenantId);
+            .Where(v => accessiblePropertyIds.Contains(v.PropertyId));
 
         if (propertyId.HasValue)
             query = query.Where(v => v.PropertyId == propertyId.Value);
@@ -38,11 +40,13 @@ public class VehicleService : IVehicleService
         return (items, totalCount);
     }
 
-    public async Task<Vehicle?> GetByIdAsync(Guid tenantId, Guid id)
+    public async Task<Vehicle?> GetByIdAsync(Guid tenantId, Guid userId, UserRole userRole, Guid id)
     {
+        var accessiblePropertyIds = _db.AccessiblePropertyIds(tenantId, userId, userRole);
+
         return await _db.Vehicles
             .Include(v => v.Violations)
-            .Where(v => v.Id == id && v.Property.TenantId == tenantId)
+            .Where(v => v.Id == id && accessiblePropertyIds.Contains(v.PropertyId))
             .AsNoTracking()
             .FirstOrDefaultAsync();
     }

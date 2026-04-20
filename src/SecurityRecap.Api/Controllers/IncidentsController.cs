@@ -26,7 +26,9 @@ public class IncidentsController : BaseApiController
         [FromQuery] DateTime? to, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
         var tenantId = GetTenantId();
-        var (items, totalCount) = await _incidentService.GetAllAsync(tenantId, propertyId, type, severity, from, to, page, pageSize);
+        var userId = GetUserId();
+        var userRole = GetUserRole();
+        var (items, totalCount) = await _incidentService.GetAllAsync(tenantId, userId, userRole, propertyId, type, severity, from, to, page, pageSize);
         return Ok(new PagedResponse<Incident> { Data = items, Page = page, PageSize = pageSize, TotalCount = totalCount });
     }
 }

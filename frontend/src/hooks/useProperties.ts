@@ -14,13 +14,23 @@ export function useProperties() {
       .then((res) => {
         if (res.data.success && res.data.data) {
           setProperties(res.data.data);
-          if (!selectedPropertyId && res.data.data.length > 0) {
-            setSelectedPropertyId(res.data.data[0].id);
-          }
         }
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (properties.length === 0) {
+      setSelectedPropertyId('');
+      localStorage.removeItem('selectedPropertyId');
+      return;
+    }
+
+    const hasSelectedProperty = properties.some((property) => property.id === selectedPropertyId);
+    if (!selectedPropertyId || !hasSelectedProperty) {
+      setSelectedPropertyId(properties[0].id);
+    }
+  }, [properties, selectedPropertyId]);
 
   useEffect(() => {
     if (selectedPropertyId) {

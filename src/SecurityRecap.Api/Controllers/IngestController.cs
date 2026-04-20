@@ -7,7 +7,7 @@ namespace SecurityRecap.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/ingest")]
-[Authorize]
+[Authorize(Policy = "OperationalUser")]
 public class IngestController : BaseApiController
 {
     private readonly IIngestionService _ingestionService;
@@ -22,19 +22,24 @@ public class IngestController : BaseApiController
     public async Task<ActionResult<ApiResponse<object>>> IngestReport(
         [FromForm] Guid propertyId, IFormFile file)
     {
+        if (file is null)
+            return BadRequest(ApiResponse<object>.Fail("File is required"));
+
         if (file.Length == 0)
             return BadRequest(ApiResponse<object>.Fail("File is empty"));
 
         if (!file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)
-            && !file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            || !file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
             return BadRequest(ApiResponse<object>.Fail("Only PDF files are accepted"));
 
         var tenantId = GetTenantId();
+        var userId = GetUserId();
+        var userRole = GetUserRole();
 
         try
         {
             var reportId = await _ingestionService.IngestReportAsync(
-                tenantId, propertyId, file.OpenReadStream(), file.FileName);
+                tenantId, userId, userRole, propertyId, file.OpenReadStream(), file.FileName);
             return Ok(ApiResponse<object>.Ok(new { reportId }));
         }
         catch (KeyNotFoundException ex)

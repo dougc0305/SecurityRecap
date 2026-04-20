@@ -5,6 +5,7 @@ import {
   MessageSquare, Settings, LogOut, Shield
 } from 'lucide-react';
 import './Layout.css';
+import { formatRoleLabel } from '../utils/authorization';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -47,7 +48,7 @@ export function Layout() {
         <div className="sidebar-footer">
           <div className="user-info">
             <span className="user-name">{user?.fullName}</span>
-            <span className="user-role">{user?.role}</span>
+            <span className="user-role">{formatRoleLabel(user?.role)}</span>
           </div>
           <button className="logout-btn" onClick={handleLogout} title="Sign out">
             <LogOut size={18} />

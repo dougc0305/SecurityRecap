@@ -73,6 +73,17 @@ export interface Incident {
   createdAt: string;
 }
 
+export interface Violation {
+  id: string;
+  incidentId: string;
+  vehicleId: string | null;
+  violationType: string;
+  location: string | null;
+  noticeIssued: boolean;
+  towNotified: boolean;
+  createdAt: string;
+}
+
 export interface Vehicle {
   id: string;
   propertyId: string;
@@ -84,6 +95,19 @@ export interface Vehicle {
   firstSeen: string | null;
   lastSeen: string | null;
   violationCount: number;
+  notes: string | null;
+  createdAt: string;
+  violations?: Violation[];
+}
+
+export interface AddressOfInterest {
+  id: string;
+  propertyId: string;
+  address: string;
+  label: string | null;
+  incidentCount: number;
+  firstFlagged: string | null;
+  lastIncident: string | null;
   notes: string | null;
   createdAt: string;
 }

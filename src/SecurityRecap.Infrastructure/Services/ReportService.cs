@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SecurityRecap.Core.Entities;
+using SecurityRecap.Core.Enums;
 using SecurityRecap.Core.Interfaces;
 using SecurityRecap.Infrastructure.Data;
 
@@ -15,11 +16,12 @@ public class ReportService : IReportService
     }
 
     public async Task<(IEnumerable<Report> Items, int TotalCount)> GetAllAsync(
-        Guid tenantId, Guid? propertyId, int page, int pageSize)
+        Guid tenantId, Guid userId, UserRole userRole, Guid? propertyId, int page, int pageSize)
     {
+        var accessiblePropertyIds = _db.AccessiblePropertyIds(tenantId, userId, userRole);
+
         var query = _db.Reports
-            .Include(r => r.Property)
-            .Where(r => r.Property.TenantId == tenantId);
+            .Where(r => accessiblePropertyIds.Contains(r.PropertyId));
 
         if (propertyId.HasValue)
             query = query.Where(r => r.PropertyId == propertyId.Value);
@@ -36,11 +38,13 @@ public class ReportService : IReportService
         return (items, totalCount);
     }
 
-    public async Task<Report?> GetByIdAsync(Guid tenantId, Guid id)
+    public async Task<Report?> GetByIdAsync(Guid tenantId, Guid userId, UserRole userRole, Guid id)
     {
+        var accessiblePropertyIds = _db.AccessiblePropertyIds(tenantId, userId, userRole);
+
         return await _db.Reports
             .Include(r => r.Incidents)
-            .Where(r => r.Id == id && r.Property.TenantId == tenantId)
+            .Where(r => r.Id == id && accessiblePropertyIds.Contains(r.PropertyId))
             .AsNoTracking()
             .FirstOrDefaultAsync();
     }

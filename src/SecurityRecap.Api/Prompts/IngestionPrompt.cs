@@ -13,6 +13,9 @@ public static class IngestionPrompt
 
         Return a JSON object with the following structure:
         {
+            "report_date": "YYYY-MM-DD (the date the report covers, extracted from the report header/title/body; if a date range, use the end date)",
+            "period_start": "ISO 8601 datetime for the start of the reporting period, or null if not present",
+            "period_end": "ISO 8601 datetime for the end of the reporting period, or null if not present",
             "incidents": [
                 {
                     "incident_time": "ISO 8601 datetime",

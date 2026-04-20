@@ -11,7 +11,13 @@ export function VehiclesPage() {
   const [page, setPage] = useState(1);
   const [plateSearch, setPlateSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Vehicle | null>(null);
   const pageSize = 20;
+
+  const openDetail = async (id: string) => {
+    const res = await vehiclesApi.getById(id);
+    if (res.data.success && res.data.data) setSelected(res.data.data);
+  };
 
   useEffect(() => {
     if (!selectedPropertyId) return;
@@ -63,6 +69,50 @@ export function VehiclesPage() {
         <span className="pagination-info">{totalCount} vehicle{totalCount !== 1 ? 's' : ''}</span>
       </div>
 
+      {selected ? (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h2 style={{ fontFamily: 'monospace', letterSpacing: 1 }}>{selected.plateNumber}</h2>
+            <button className="btn btn-secondary" onClick={() => setSelected(null)}>← Back</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16, color: 'var(--text-secondary)' }}>
+            <div><strong>State:</strong> {selected.plateState ?? '-'}</div>
+            <div><strong>Make:</strong> {selected.make ?? '-'}</div>
+            <div><strong>Model:</strong> {selected.model ?? '-'}</div>
+            <div><strong>Color:</strong> {selected.color ?? '-'}</div>
+            <div><strong>Violations:</strong> {selected.violationCount}</div>
+            <div><strong>First seen:</strong> {selected.firstSeen ? new Date(selected.firstSeen).toLocaleDateString() : '-'}</div>
+            <div><strong>Last seen:</strong> {selected.lastSeen ? new Date(selected.lastSeen).toLocaleDateString() : '-'}</div>
+          </div>
+          <h3 style={{ marginTop: 16 }}>Violation History</h3>
+          {!selected.violations || selected.violations.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)' }}>No violations recorded.</p>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Location</th>
+                  <th>Notice</th>
+                  <th>Tow</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selected.violations.map((v) => (
+                  <tr key={v.id}>
+                    <td>{v.violationType}</td>
+                    <td>{v.location ?? '-'}</td>
+                    <td>{v.noticeIssued ? 'Yes' : 'No'}</td>
+                    <td>{v.towNotified ? 'Yes' : 'No'}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{new Date(v.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      ) : (
       <div className="card">
         {loading ? (
           <div className="loading">Loading...</div>
@@ -89,7 +139,7 @@ export function VehiclesPage() {
                 </thead>
                 <tbody>
                   {vehicles.map((v) => (
-                    <tr key={v.id}>
+                    <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => openDetail(v.id)}>
                       <td style={{ fontWeight: 600, fontFamily: 'monospace', letterSpacing: 1 }}>
                         {v.plateNumber}
                       </td>
@@ -131,6 +181,7 @@ export function VehiclesPage() {
           </>
         )}
       </div>
+      )}
     </div>
   );
 }

@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { useProperties } from '../hooks/useProperties';
+import { useAuth } from '../hooks/useAuth';
 import { reportsApi, ingestApi } from '../services/api';
 import type { Report } from '../types/api';
 import { Upload, ChevronLeft, ChevronRight, FileText, Eye } from 'lucide-react';
+import { canIngestReports } from '../utils/authorization';
 
 export function ReportsPage() {
+  const { user } = useAuth();
   const { properties, selectedPropertyId, setSelectedPropertyId } = useProperties();
   const [reports, setReports] = useState<Report[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -13,6 +17,10 @@ export function ReportsPage() {
   const [uploading, setUploading] = useState(false);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const pageSize = 20;
+  const canUploadReports = canIngestReports(user);
+  const sanitizedSummaryHtml = selectedReport?.aiSummaryHtml
+    ? DOMPurify.sanitize(selectedReport.aiSummaryHtml, { USE_PROFILES: { html: true } })
+    : '';
 
   const fetchReports = () => {
     if (!selectedPropertyId) return;
@@ -62,17 +70,19 @@ export function ReportsPage() {
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
-          <label className="btn btn-primary" style={{ position: 'relative' }}>
-            <Upload size={16} />
-            {uploading ? 'Processing...' : 'Upload PDF'}
-            <input
-              type="file"
-              accept=".pdf"
-              onChange={handleUpload}
-              disabled={uploading || !selectedPropertyId}
-              style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', left: 0, top: 0, cursor: 'pointer' }}
-            />
-          </label>
+          {canUploadReports && (
+            <label className="btn btn-primary" style={{ position: 'relative' }}>
+              <Upload size={16} />
+              {uploading ? 'Processing...' : 'Upload PDF'}
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={handleUpload}
+                disabled={uploading || !selectedPropertyId}
+                style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', left: 0, top: 0, cursor: 'pointer' }}
+              />
+            </label>
+          )}
         </div>
       </div>
 
@@ -94,21 +104,25 @@ export function ReportsPage() {
           {selectedReport.aiSummaryHtml ? (
             <div
               style={{ lineHeight: 1.7, color: 'var(--text-secondary)' }}
-              dangerouslySetInnerHTML={{ __html: selectedReport.aiSummaryHtml }}
+              dangerouslySetInnerHTML={{ __html: sanitizedSummaryHtml }}
             />
           ) : (
             <p style={{ color: 'var(--text-muted)' }}>No AI summary available.</p>
           )}
           {selectedReport.rawPdfUrl && (
             <div style={{ marginTop: 16 }}>
-              <a
-                href={selectedReport.rawPdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
                 className="btn btn-secondary"
+                onClick={async () => {
+                  const res = await reportsApi.getPdfBlob(selectedReport.id);
+                  const url = URL.createObjectURL(res.data);
+                  window.open(url, '_blank', 'noopener,noreferrer');
+                  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+                }}
               >
                 <FileText size={16} /> Download Original PDF
-              </a>
+              </button>
             </div>
           )}
         </div>
@@ -142,9 +156,19 @@ export function ReportsPage() {
                         <td>{r.aiSummaryHtml ? 'Available' : '-'}</td>
                         <td>
                           {r.rawPdfUrl ? (
-                            <a href={r.rawPdfUrl} target="_blank" rel="noopener noreferrer">
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ padding: '4px 10px' }}
+                              onClick={async () => {
+                                const res = await reportsApi.getPdfBlob(r.id);
+                                const url = URL.createObjectURL(res.data);
+                                window.open(url, '_blank', 'noopener,noreferrer');
+                                setTimeout(() => URL.revokeObjectURL(url), 60_000);
+                              }}
+                            >
                               <FileText size={16} />
-                            </a>
+                            </button>
                           ) : '-'}
                         </td>
                         <td>
