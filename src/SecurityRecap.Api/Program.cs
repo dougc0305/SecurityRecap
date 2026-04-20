@@ -68,12 +68,12 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("OperationalUser", policy =>
         policy.RequireRole(
             nameof(UserRole.Admin),
-            nameof(UserRole.PropertyManager),
-            nameof(UserRole.SecurityPersonnel)));
+            nameof(UserRole.Manager)));
 });
 
 // Services
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 
 builder.Services.AddScoped<IPropertyService, PropertyService>();
 builder.Services.AddScoped<IBlobStorageService, LocalFileStorageService>();

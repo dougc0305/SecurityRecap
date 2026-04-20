@@ -23,5 +23,6 @@ public record UserInfo(
     string Email,
     string FullName,
     string Role,
-    Guid TenantId
+    Guid TenantId,
+    bool MustChangePassword
 );

@@ -10,6 +10,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { AddressesPage } from './pages/AddressesPage';
 import { ChatPage } from './pages/ChatPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ChangePasswordPage } from './pages/ChangePasswordPage';
 
 function App() {
   return (
@@ -17,6 +18,14 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/change-password"
+            element={
+              <ProtectedRoute>
+                <ChangePasswordPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             element={
               <ProtectedRoute>

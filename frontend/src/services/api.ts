@@ -1,5 +1,10 @@
 import axios from 'axios';
-import type { ApiResponse, LoginRequest, LoginResponse, PagedResponse, Property, Report, Incident, Vehicle, AddressOfInterest, ChatRequest, ChatResponse } from '../types/api';
+import type {
+  ApiResponse, LoginRequest, LoginResponse, PagedResponse,
+  Property, Report, Incident, Vehicle, AddressOfInterest, ChatRequest, ChatResponse,
+  ManagedUser, CreateUserRequest, CreateUserResponse, UpdateUserRequest,
+  ResetPasswordResponse, ChangePasswordRequest,
+} from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5069/api';
 
@@ -54,6 +59,24 @@ export const authApi = {
     api.post<ApiResponse<LoginResponse>>('/auth/login', data),
   refresh: (refreshToken: string) =>
     api.post<ApiResponse<LoginResponse>>('/auth/refresh', { refreshToken }),
+  changePassword: (data: ChangePasswordRequest) =>
+    api.post<ApiResponse<{ changed: boolean }>>('/auth/change-password', data),
+};
+
+// Users (admin-only)
+export const usersApi = {
+  getAll: () =>
+    api.get<ApiResponse<ManagedUser[]>>('/v1/users'),
+  create: (data: CreateUserRequest) =>
+    api.post<ApiResponse<CreateUserResponse>>('/v1/users', data),
+  update: (id: string, data: UpdateUserRequest) =>
+    api.put<ApiResponse<ManagedUser>>(`/v1/users/${id}`, data),
+  setActive: (id: string, isActive: boolean) =>
+    api.put<ApiResponse<ManagedUser>>(`/v1/users/${id}/active`, { isActive }),
+  setProperties: (id: string, propertyIds: string[]) =>
+    api.put<ApiResponse<ManagedUser>>(`/v1/users/${id}/properties`, { propertyIds }),
+  resetPassword: (id: string) =>
+    api.post<ApiResponse<ResetPasswordResponse>>(`/v1/users/${id}/reset-password`),
 };
 
 // Properties

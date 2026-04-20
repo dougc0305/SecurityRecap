@@ -19,6 +19,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<AddressOfInterest> AddressesOfInterest => Set<AddressOfInterest>();
     public DbSet<UserProperty> UserProperties => Set<UserProperty>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<ServiceAssignment> ServiceAssignments => Set<ServiceAssignment>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -130,6 +131,18 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             e.HasOne(rt => rt.User).WithMany().HasForeignKey(rt => rt.UserId);
             e.HasIndex(rt => rt.Token).IsUnique();
             e.Property(rt => rt.CreatedAt).HasDefaultValueSql("now()");
+        });
+
+        // ServiceAssignment (cross-tenant property visibility for management/security companies)
+        builder.Entity<ServiceAssignment>(e =>
+        {
+            e.HasKey(sa => sa.Id);
+            e.Property(sa => sa.Id).HasDefaultValueSql("gen_random_uuid()");
+            e.HasOne(sa => sa.Property).WithMany().HasForeignKey(sa => sa.PropertyId);
+            e.HasOne(sa => sa.Tenant).WithMany().HasForeignKey(sa => sa.TenantId);
+            e.Property(sa => sa.Role).HasConversion<string>();
+            e.Property(sa => sa.CreatedAt).HasDefaultValueSql("now()");
+            e.HasIndex(sa => new { sa.PropertyId, sa.TenantId, sa.Role }).IsUnique();
         });
     }
 

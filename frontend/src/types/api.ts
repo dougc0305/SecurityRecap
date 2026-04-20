@@ -30,6 +30,44 @@ export interface UserInfo {
   fullName: string;
   role: string;
   tenantId: string;
+  mustChangePassword: boolean;
+}
+
+export interface ManagedUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  createdAt: string;
+  propertyIds: string[];
+}
+
+export interface CreateUserRequest {
+  email: string;
+  fullName: string;
+  role: string;
+  propertyIds: string[];
+}
+
+export interface CreateUserResponse {
+  user: ManagedUser;
+  tempPassword: string;
+}
+
+export interface UpdateUserRequest {
+  fullName: string;
+  role: string;
+}
+
+export interface ResetPasswordResponse {
+  tempPassword: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
 }
 
 export interface Property {

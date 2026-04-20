@@ -31,7 +31,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  const value: AuthContextType = { user, login, logout, isAuthenticated };
+  const markPasswordChanged = useCallback(() => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, mustChangePassword: false };
+      localStorage.setItem('user', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const value: AuthContextType = { user, login, logout, isAuthenticated, markPasswordChanged };
 
   return <AuthContext value={value}>{children}</AuthContext>;
 }

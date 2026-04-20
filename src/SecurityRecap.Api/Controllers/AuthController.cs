@@ -11,27 +11,30 @@ namespace SecurityRecap.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-[AllowAnonymous]
-public class AuthController : ControllerBase
+public class AuthController : BaseApiController
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly ITokenService _tokenService;
     private readonly AppDbContext _db;
+    private readonly IUserManagementService _users;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         ITokenService tokenService,
-        AppDbContext db)
+        AppDbContext db,
+        IUserManagementService users)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _tokenService = tokenService;
         _db = db;
+        _users = users;
     }
 
     [HttpPost("login")]
+    [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<LoginResponse>>> Login([FromBody] LoginRequest request)
     {
         var user = await _userManager.FindByEmailAsync(request.Email);
@@ -57,13 +60,14 @@ public class AuthController : ControllerBase
             AccessToken: accessToken,
             RefreshToken: refreshToken,
             ExpiresAt: DateTime.UtcNow.AddHours(1),
-            User: new UserInfo(user.Id, user.Email!, user.FullName, user.Role.ToString(), user.TenantId)
+            User: new UserInfo(user.Id, user.Email!, user.FullName, user.Role.ToString(), user.TenantId, user.MustChangePassword)
         );
 
         return Ok(ApiResponse<LoginResponse>.Ok(response));
     }
 
     [HttpPost("refresh")]
+    [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<LoginResponse>>> Refresh([FromBody] RefreshRequest request)
     {
         var storedToken = await _db.RefreshTokens
@@ -96,9 +100,20 @@ public class AuthController : ControllerBase
             AccessToken: accessToken,
             RefreshToken: newRefreshToken,
             ExpiresAt: DateTime.UtcNow.AddHours(1),
-            User: new UserInfo(user.Id, user.Email!, user.FullName, user.Role.ToString(), user.TenantId)
+            User: new UserInfo(user.Id, user.Email!, user.FullName, user.Role.ToString(), user.TenantId, user.MustChangePassword)
         );
 
         return Ok(ApiResponse<LoginResponse>.Ok(response));
+    }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<object>>> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        var userId = GetUserId();
+        var ok = await _users.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword);
+        return ok
+            ? Ok(ApiResponse<object>.Ok(new { changed = true }))
+            : BadRequest(ApiResponse<object>.Fail("Current password is incorrect or new password does not meet policy."));
     }
 }

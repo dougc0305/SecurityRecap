@@ -6,6 +6,7 @@ export interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  markPasswordChanged: () => void;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);
