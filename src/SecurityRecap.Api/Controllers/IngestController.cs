@@ -21,7 +21,7 @@ public class IngestController : BaseApiController
 
     [HttpPost("report")]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(20 * 1024 * 1024)] // 20 MB
+    [RequestSizeLimit(25 * 1024 * 1024)] // 25 MB
     public async Task<ActionResult<ApiResponse<IngestReportResponse>>> IngestReport(
         [FromForm] Guid propertyId, IFormFile file, [FromForm] string? externalId = null)
     {
