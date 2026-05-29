@@ -46,11 +46,28 @@ export function ReportsPage() {
       await ingestApi.uploadReport(selectedPropertyId, file);
       fetchReports();
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } }; message?: string };
-      const friendly = e.response?.data?.error
+      const e = err as {
+        response?: {
+          data?: {
+            error?: string;
+            title?: string;
+            detail?: string;
+            errors?: Record<string, string[]>;
+          };
+        };
+        message?: string;
+      };
+      const data = e.response?.data;
+      const validationErrors = data?.errors
+        ? Object.values(data.errors).flat().join(' ')
+        : undefined;
+      const reason = data?.error
+        ?? validationErrors
+        ?? data?.detail
+        ?? data?.title
         ?? e.message
-        ?? 'Upload failed.';
-      alert(friendly);
+        ?? 'Unknown error.';
+      alert(`Upload failed: ${reason}`);
       console.error(err);
     } finally {
       setUploading(false);
