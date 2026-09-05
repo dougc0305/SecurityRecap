@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SecurityRecap.Api.DTOs;
@@ -14,17 +15,20 @@ public class IngestionService : IIngestionService
     private readonly AppDbContext _db;
     private readonly IBlobStorageService _blobStorage;
     private readonly IClaudeApiService _claudeApi;
+    private readonly ReportHistoryContextBuilder _historyBuilder;
     private readonly ILogger<IngestionService> _logger;
 
     public IngestionService(
         AppDbContext db,
         IBlobStorageService blobStorage,
         IClaudeApiService claudeApi,
+        ReportHistoryContextBuilder historyBuilder,
         ILogger<IngestionService> logger)
     {
         _db = db;
         _blobStorage = blobStorage;
         _claudeApi = claudeApi;
+        _historyBuilder = historyBuilder;
         _logger = logger;
     }
 
@@ -69,23 +73,10 @@ public class IngestionService : IIngestionService
         var pdfUrl = await _blobStorage.UploadAsync(memoryStream, fileName, "application/pdf");
         _logger.LogInformation("Uploaded PDF to {Url}", pdfUrl);
 
-        // Get recent incident history for context
-        var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
-        var recentIncidents = await _db.Incidents
-            .Where(i => i.PropertyId == propertyId && i.CreatedAt >= thirtyDaysAgo)
-            .OrderByDescending(i => i.IncidentTime)
-            .Select(i => new
-            {
-                i.IncidentTime,
-                IncidentType = i.IncidentType.ToString(),
-                Severity = i.Severity.ToString(),
-                i.Location,
-                i.Description
-            })
-            .Take(100)
-            .ToListAsync();
-
-        var historyJson = JsonSerializer.Serialize(recentIncidents);
+        // Build the property's historical picture so the summary can compare this shift
+        // against what normal looks like, rather than describing it in isolation.
+        var history = await _historyBuilder.BuildAsync(propertyId);
+        var historyJson = JsonSerializer.Serialize(history, HistoryJsonOptions);
         var systemPrompt = IngestionPrompt.Build(historyJson);
 
         // Call Claude API
@@ -115,6 +106,26 @@ public class IngestionService : IIngestionService
                 existingReports.Count, propertyId, reportDate);
         }
 
+        // Persist the markdown summary as a standalone file so it can be downloaded,
+        // emailed, or archived without re-running the model.
+        string? markdownUrl = null;
+        if (!string.IsNullOrWhiteSpace(result.MarkdownSummary))
+        {
+            var markdownBytes = System.Text.Encoding.UTF8.GetBytes(result.MarkdownSummary);
+            await using var markdownStream = new MemoryStream(markdownBytes);
+            markdownUrl = await _blobStorage.UploadAsync(
+                markdownStream,
+                $"summary-{reportDate:yyyy-MM-dd}.md",
+                "text/markdown");
+            _logger.LogInformation("Uploaded markdown summary to {Url}", markdownUrl);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Claude returned no markdown_summary for property {PropertyId} on {Date}; summary file not written",
+                propertyId, reportDate);
+        }
+
         // Create report
         var report = new Report
         {
@@ -124,6 +135,7 @@ public class IngestionService : IIngestionService
             PeriodStart = TryParseDateTime(result.PeriodStart),
             PeriodEnd = TryParseDateTime(result.PeriodEnd),
             RawPdfUrl = pdfUrl,
+            MdSummaryUrl = markdownUrl,
             AiSummaryHtml = result.HtmlSummary,
             ExternalId = string.IsNullOrWhiteSpace(externalId) ? null : externalId,
             OfficerNames = result.Incidents
@@ -260,8 +272,20 @@ public class IngestionService : IIngestionService
             "Ingested report {ReportId}: {IncidentCount} incidents, {VehicleCount} vehicles, {AddressCount} addresses",
             report.Id, result.Incidents.Count, result.Vehicles.Count, incidentsByAddress.Count());
 
-        return new IngestionOutcome(report.Id, AlreadyIngested: false);
+        return new IngestionOutcome(
+            report.Id,
+            AlreadyIngested: false,
+            ReportDate: reportDate,
+            AiSummaryHtml: result.HtmlSummary,
+            MarkdownSummary: result.MarkdownSummary,
+            IncidentCount: result.Incidents.Count,
+            UrgentItems: result.UrgentItems);
     }
+
+    private static readonly JsonSerializerOptions HistoryJsonOptions = new()
+    {
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
 
     private static string StripCodeFences(string text)
     {
@@ -346,7 +370,19 @@ public class IngestionService : IIngestionService
     private static DateTime? TryParseDateTime(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
-        return DateTime.TryParse(value, out var dt) ? DateTime.SpecifyKind(dt, DateTimeKind.Utc) : null;
+
+        // Patrol reports carry local times with an offset (Palm Cove logs CDT). Those must be
+        // converted to UTC, not relabelled: stamping a local time as UTC shifts every incident
+        // by the offset, which quietly corrupts the day/week windows the history context and
+        // the "same address twice this month" comparisons are built from.
+        // AssumeUniversal keeps the previous behaviour for values that carry no offset at all.
+        return DateTime.TryParse(
+            value,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal,
+            out var dt)
+            ? DateTime.SpecifyKind(dt, DateTimeKind.Utc)
+            : null;
     }
 
     private static IncidentType ParseIncidentType(string value)

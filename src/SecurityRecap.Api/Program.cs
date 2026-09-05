@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -13,6 +14,24 @@ using SecurityRecap.Infrastructure.Data;
 using SecurityRecap.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Data Protection — protects integration secrets stored in the database (the Graph client
+// secret). The key ring MUST live outside the deploy root: deploy.bat moves that directory
+// wholesale on every release, which would otherwise silently leave every stored secret
+// undecryptable and require re-entering it after each deploy.
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("SecurityRecap");
+var keyRingPath = builder.Configuration["DataProtection:KeyPath"];
+if (!string.IsNullOrWhiteSpace(keyRingPath))
+{
+    Directory.CreateDirectory(keyRingPath);
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keyRingPath));
+}
+else if (!builder.Environment.IsDevelopment())
+{
+    Console.Error.WriteLine(
+        "WARNING: DataProtection:KeyPath is not configured. Stored mailbox client secrets will "
+        + "become undecryptable when the deploy replaces the application directory.");
+}
 
 // Database
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -89,7 +108,18 @@ builder.Services.AddHttpClient<IClaudeApiService, ClaudeApiService>(client =>
 {
     client.Timeout = TimeSpan.FromMinutes(5);
 });
+builder.Services.AddScoped<ReportHistoryContextBuilder>();
 builder.Services.AddScoped<IIngestionService, IngestionService>();
+
+// Automated report pickup from a mailbox
+builder.Services.AddScoped<ISecretProtector, DataProtectionSecretProtector>();
+builder.Services.AddHttpClient<IMailboxClient, GraphMailboxClient>(client =>
+{
+    // Report PDFs run to a few MB and Graph can be slow to hand them over.
+    client.Timeout = TimeSpan.FromMinutes(2);
+});
+builder.Services.AddScoped<IMailboxIngestionService, MailboxIngestionService>();
+builder.Services.AddHostedService<MailboxPollingBackgroundService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IIncidentService, IncidentService>();
 builder.Services.AddScoped<IVehicleService, VehicleService>();

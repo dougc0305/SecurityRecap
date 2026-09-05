@@ -55,4 +55,18 @@ public class ReportsController : BaseApiController
         var stream = await _blobStorage.DownloadAsync(report.RawPdfUrl);
         return File(stream, "application/pdf", $"report-{id}.pdf");
     }
+
+    [HttpGet("{id:guid}/summary")]
+    public async Task<IActionResult> GetSummary(Guid id)
+    {
+        var tenantId = GetTenantId();
+        var userId = GetUserId();
+        var userRole = GetUserRole();
+        var report = await _reportService.GetByIdAsync(tenantId, userId, userRole, id);
+        if (report is null || string.IsNullOrWhiteSpace(report.MdSummaryUrl))
+            return NotFound();
+
+        var stream = await _blobStorage.DownloadAsync(report.MdSummaryUrl);
+        return File(stream, "text/markdown", $"summary-{report.ReportDate:yyyy-MM-dd}.md");
+    }
 }

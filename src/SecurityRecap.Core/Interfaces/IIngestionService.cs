@@ -2,7 +2,14 @@ namespace SecurityRecap.Core.Interfaces;
 
 using SecurityRecap.Core.Enums;
 
-public record IngestionOutcome(Guid ReportId, bool AlreadyIngested);
+public record IngestionOutcome(
+    Guid ReportId,
+    bool AlreadyIngested,
+    DateOnly? ReportDate = null,
+    string? AiSummaryHtml = null,
+    string? MarkdownSummary = null,
+    int IncidentCount = 0,
+    IReadOnlyList<string>? UrgentItems = null);
 
 public interface IIngestionService
 {

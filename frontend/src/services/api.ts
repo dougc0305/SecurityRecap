@@ -5,6 +5,7 @@ import type {
   ManagedUser, CreateUserRequest, CreateUserResponse, UpdateUserRequest,
   ResetPasswordResponse, ChangePasswordRequest,
   ApiKey, CreateApiKeyRequest, CreateApiKeyResponse,
+  MailboxIngestConfig, SaveMailboxIngestConfigRequest, MailboxPollResult, MailboxVerifyResult,
 } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5069/api';
@@ -110,6 +111,8 @@ export const reportsApi = {
     api.get<ApiResponse<Report>>(`/v1/reports/${id}`),
   getPdfBlob: (id: string) =>
     api.get<Blob>(`/v1/reports/${id}/pdf`, { responseType: 'blob' }),
+  getSummaryBlob: (id: string) =>
+    api.get<Blob>(`/v1/reports/${id}/summary`, { responseType: 'blob' }),
 };
 
 // Incidents
@@ -148,6 +151,20 @@ export const ingestApi = {
     formData.append('file', file);
     return api.post<ApiResponse<{ reportId: string }>>('/v1/ingest/report', formData);
   },
+};
+
+// Mailbox ingest (admin-only)
+export const mailboxIngestApi = {
+  get: (propertyId: string) =>
+    api.get<ApiResponse<MailboxIngestConfig | null>>(`/v1/mailbox-ingest/${propertyId}`),
+  save: (data: SaveMailboxIngestConfigRequest) =>
+    api.put<ApiResponse<MailboxIngestConfig>>('/v1/mailbox-ingest', data),
+  remove: (propertyId: string) =>
+    api.delete<ApiResponse<boolean>>(`/v1/mailbox-ingest/${propertyId}`),
+  verify: (propertyId: string) =>
+    api.post<ApiResponse<MailboxVerifyResult>>(`/v1/mailbox-ingest/${propertyId}/verify`),
+  poll: (propertyId: string) =>
+    api.post<ApiResponse<MailboxPollResult>>(`/v1/mailbox-ingest/${propertyId}/poll`),
 };
 
 // Chat
