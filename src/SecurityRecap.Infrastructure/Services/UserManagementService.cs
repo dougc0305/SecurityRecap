@@ -97,18 +97,31 @@ public class UserManagementService : IUserManagementService
         return ToSummary(user);
     }
 
-    public async Task<UserSummary> ReplacePropertiesAsync(Guid tenantId, Guid userId, IEnumerable<Guid> propertyIds)
+    public async Task<UserSummary> ReplacePropertiesAsync(
+        Guid tenantId, Guid userId, IEnumerable<PropertyAssignment> assignments)
     {
         var user = await _db.Users
             .Include(u => u.UserProperties)
             .FirstOrDefaultAsync(u => u.TenantId == tenantId && u.Id == userId)
             ?? throw new KeyNotFoundException("User not found");
 
-        var validIds = await ValidatePropertyIdsAsync(tenantId, propertyIds);
+        // Last write wins if the same property appears twice.
+        var requested = assignments
+            .GroupBy(a => a.PropertyId)
+            .ToDictionary(g => g.Key, g => g.Last().ReceivesSummary);
+
+        var validIds = await ValidatePropertyIdsAsync(tenantId, requested.Keys);
 
         _db.UserProperties.RemoveRange(user.UserProperties);
         foreach (var pid in validIds)
-            _db.UserProperties.Add(new UserProperty { UserId = user.Id, PropertyId = pid });
+        {
+            _db.UserProperties.Add(new UserProperty
+            {
+                UserId = user.Id,
+                PropertyId = pid,
+                ReceivesSummary = requested[pid]
+            });
+        }
         await _db.SaveChangesAsync();
 
         var reloaded = await _db.Users.Include(u => u.UserProperties).FirstAsync(u => u.Id == user.Id);
@@ -164,7 +177,8 @@ public class UserManagementService : IUserManagementService
 
     private static UserSummary ToSummary(ApplicationUser u) => new(
         u.Id, u.Email!, u.FullName, u.Role, u.IsActive, u.MustChangePassword, u.CreatedAt,
-        u.UserProperties.Select(up => up.PropertyId).ToList());
+        u.UserProperties.Select(up => up.PropertyId).ToList(),
+        u.UserProperties.Where(up => up.ReceivesSummary).Select(up => up.PropertyId).ToList());
 
     private static string GenerateTempPassword()
     {

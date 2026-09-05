@@ -61,9 +61,20 @@ public class MailboxIngestController : BaseApiController
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
+        // Recipients can now come from user accounts flagged for this property, so an empty
+        // external list is fine — but both being empty means the mail would go nowhere.
         if (request.SendSummaryEmail && recipients.Length == 0)
-            return BadRequest(ApiResponse<MailboxIngestConfigDto>.Fail(
-                "Add at least one recipient before enabling the summary email"));
+        {
+            var flaggedUsers = await _db.UserProperties
+                .CountAsync(up => up.PropertyId == request.PropertyId
+                    && up.ReceivesSummary
+                    && up.User.IsActive);
+
+            if (flaggedUsers == 0)
+                return BadRequest(ApiResponse<MailboxIngestConfigDto>.Fail(
+                    "No one would receive the summary. Flag a user to receive it for this property, "
+                    + "or add an external recipient."));
+        }
 
         var config = await _db.MailboxIngestConfigs
             .FirstOrDefaultAsync(c => c.PropertyId == request.PropertyId);

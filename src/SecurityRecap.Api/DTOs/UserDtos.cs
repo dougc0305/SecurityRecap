@@ -10,7 +10,8 @@ public record UserDto(
     bool IsActive,
     bool MustChangePassword,
     DateTime CreatedAt,
-    IReadOnlyList<Guid> PropertyIds);
+    IReadOnlyList<Guid> PropertyIds,
+    IReadOnlyList<Guid> SummaryPropertyIds);
 
 public record CreateUserRequest(
     [Required, EmailAddress] string Email,
@@ -26,7 +27,13 @@ public record UpdateUserRequest(
 
 public record SetActiveRequest(bool IsActive);
 
-public record AssignPropertiesRequest(IReadOnlyList<Guid> PropertyIds);
+/// <summary>
+/// Assignments are replaced wholesale. SummaryPropertyIds must be a subset of PropertyIds:
+/// a user cannot be mailed reports about a property they are not assigned to.
+/// </summary>
+public record AssignPropertiesRequest(
+    IReadOnlyList<Guid> PropertyIds,
+    IReadOnlyList<Guid>? SummaryPropertyIds);
 
 public record ResetPasswordResponse(string TempPassword);
 

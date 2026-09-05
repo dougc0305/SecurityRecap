@@ -466,15 +466,20 @@ export function MailboxIngestSection() {
           {form.sendSummaryEmail && (
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
               <div>
-                <label style={labelStyle}>Recipients *</label>
+                <label style={labelStyle}>Additional recipients</label>
                 <textarea
                   className="input"
                   rows={2}
-                  placeholder="one@example.com, two@example.com"
+                  placeholder="someone@example.com, another@example.com"
                   value={recipientsText}
                   onChange={(e) => setRecipientsText(e.target.value)}
                 />
-                <div style={hintStyle}>Separate with commas, semicolons, or new lines.</div>
+                <div style={hintStyle}>
+                  For people who need the report but have no account. Anyone with an account is
+                  set up under Users &mdash; tick <em>Summary email</em> against this property there,
+                  so removing their access also stops their mail. Separate with commas,
+                  semicolons, or new lines.
+                </div>
               </div>
               <div>
                 <label style={labelStyle}>Subject prefix</label>

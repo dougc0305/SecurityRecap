@@ -92,7 +92,8 @@ id, tenant_id (FK), email, full_name, role (admin/board_member/viewer),
 is_active, created_at
 
 ### user_properties
-user_id (FK), property_id (FK), PRIMARY KEY (user_id, property_id)
+user_id (FK), property_id (FK), receives_summary (bool, default false),
+PRIMARY KEY (user_id, property_id)
 
 ## API Conventions
 - RESTful endpoints under /api/v1/
@@ -186,6 +187,10 @@ the Entra app registration, per-property setup, and deployment prerequisites.
 - MailboxPollingBackgroundService ticks on MailboxIngest:TickIntervalSeconds and polls each
   property whose own poll_interval_minutes has elapsed; failures back off exponentially.
 - Idempotency: report external_id is `graph:{internetMessageId}:{fileName}`.
+- Summary recipients are resolved at send time, never stored as a list: active users with
+  user_properties.receives_summary for that property, plus mailbox_ingest_configs
+  .summary_recipients for people with no account. Deactivating a user or removing their
+  property assignment stops their mail on the next report.
 - The poller has no signed-in user; it calls IngestReportAsync with the property's own
   tenant_id, Guid.Empty user id, and UserRole.Admin.
 - Integration secrets use ISecretProtector (ASP.NET Data Protection), NOT the one-way hashing
