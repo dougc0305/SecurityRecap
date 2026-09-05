@@ -228,19 +228,22 @@ public class GraphMailboxClient : IMailboxClient
     public async Task<IReadOnlyList<MailboxMessage>> FetchMessagesAsync(
         MailboxCredentials credentials, MailboxQuery query, CancellationToken ct = default)
     {
-        var filters = new List<string> { "hasAttachments eq true" };
+        // Exchange rejects a restriction on hasAttachments or from combined with an $orderby on
+        // receivedDateTime — "The restriction or sort order is too complex for this operation".
+        // So receivedDateTime is the only server-side filter, matching the sort key, and the
+        // sender/attachment/subject predicates are applied client-side below. The mailbox is
+        // dedicated to these reports, so the extra rows fetched are few and carry no bodies.
+        var filter = "receivedDateTime ge " + query.ReceivedAfterUtc.ToString("yyyy-MM-ddTHH:mm:ssZ");
 
-        if (query.ReceivedAfterUtc is { } after)
-            filters.Add("receivedDateTime ge " + after.ToString("yyyy-MM-ddTHH:mm:ssZ"));
-
-        if (!string.IsNullOrWhiteSpace(query.FromAddress))
-            filters.Add($"from/emailAddress/address eq '{EscapeODataLiteral(query.FromAddress)}'");
-
+        // Ascending on purpose. The caller advances its watermark across the contiguous run of
+        // messages it handled, so if this page is truncated by $top the unfetched remainder is
+        // strictly newer and gets collected on the next poll. Descending would hand back the
+        // newest messages and let the watermark jump past older ones that were never seen.
         var folder = string.IsNullOrWhiteSpace(query.FolderName) ? "inbox" : query.FolderName;
         var url = $"{GraphBase}/users/{Encode(credentials.MailboxAddress)}/mailFolders/{Encode(folder)}/messages"
             + "?$select=id,internetMessageId,subject,from,receivedDateTime,hasAttachments"
-            + "&$filter=" + Uri.EscapeDataString(string.Join(" and ", filters))
-            + "&$orderby=receivedDateTime desc"
+            + "&$filter=" + Uri.EscapeDataString(filter)
+            + "&$orderby=receivedDateTime asc"
             + "&$top=" + query.MaxMessages;
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -254,10 +257,13 @@ public class GraphMailboxClient : IMailboxClient
         {
             var subject = item.TryGetProperty("subject", out var s) ? s.GetString() ?? string.Empty : string.Empty;
 
-            // Subject matching happens here rather than in $filter: Graph's contains() support on
-            // message subject is inconsistent across mailboxes and can silently return nothing.
             if (!string.IsNullOrWhiteSpace(query.SubjectContains)
                 && !subject.Contains(query.SubjectContains, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            // Cheap skip so we never issue an attachments request for a message that has none.
+            if (item.TryGetProperty("hasAttachments", out var ha)
+                && ha.ValueKind == JsonValueKind.False)
                 continue;
 
             var id = item.GetProperty("id").GetString()!;
@@ -273,6 +279,10 @@ public class GraphMailboxClient : IMailboxClient
                 && ea.TryGetProperty("address", out var addr)
                     ? addr.GetString() ?? string.Empty
                     : string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(query.FromAddress)
+                && !string.Equals(from, query.FromAddress.Trim(), StringComparison.OrdinalIgnoreCase))
+                continue;
 
             results.Add(new MailboxMessage(id, internetMessageId, subject, from, received, Array.Empty<MailboxAttachment>()));
         }
@@ -397,6 +407,4 @@ public class GraphMailboxClient : IMailboxClient
     }
 
     private static string Encode(string segment) => Uri.EscapeDataString(segment);
-
-    private static string EscapeODataLiteral(string value) => value.Replace("'", "''");
 }

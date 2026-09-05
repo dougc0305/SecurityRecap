@@ -11,8 +11,12 @@ public record MailboxQuery(
     string FolderName,
     string? FromAddress,
     string? SubjectContains,
-    DateTime? ReceivedAfterUtc,
-    int MaxMessages = 25);
+    /// <summary>
+    /// Required, not optional: it is the only server-side restriction, and it doubles as the
+    /// sort key. Without it a request would return the oldest mail in the mailbox.
+    /// </summary>
+    DateTime ReceivedAfterUtc,
+    int MaxMessages = 50);
 
 public record MailboxAttachment(string Name, byte[] Content);
 
