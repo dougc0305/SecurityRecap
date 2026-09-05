@@ -25,6 +25,13 @@ if (!string.IsNullOrWhiteSpace(keyRingPath))
 {
     Directory.CreateDirectory(keyRingPath);
     dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keyRingPath));
+
+    // Without this the key ring is plaintext XML on disk, so anything that can read the
+    // folder can decrypt every stored integration secret. Machine-scoped DPAPI survives an
+    // app pool identity change and needs no loaded user profile, unlike the user-scoped
+    // default. Existing keys stay readable; only newly created ones are encrypted.
+    if (OperatingSystem.IsWindows())
+        dataProtection.ProtectKeysWithDpapi(protectToLocalMachine: true);
 }
 else if (!builder.Environment.IsDevelopment())
 {
