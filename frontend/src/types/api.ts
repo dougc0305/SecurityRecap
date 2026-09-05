@@ -42,6 +42,8 @@ export interface ManagedUser {
   mustChangePassword: boolean;
   createdAt: string;
   propertyIds: string[];
+  /** Subset of propertyIds whose nightly summary this user is emailed. */
+  summaryPropertyIds: string[];
 }
 
 export interface CreateUserRequest {

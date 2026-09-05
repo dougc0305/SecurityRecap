@@ -124,6 +124,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         builder.Entity<UserProperty>(e =>
         {
             e.HasKey(up => new { up.UserId, up.PropertyId });
+            e.Property(up => up.ReceivesSummary).HasDefaultValue(false);
             e.HasOne(up => up.User).WithMany(u => u.UserProperties).HasForeignKey(up => up.UserId);
             e.HasOne(up => up.Property).WithMany(p => p.UserProperties).HasForeignKey(up => up.PropertyId);
         });

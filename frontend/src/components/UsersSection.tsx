@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Plus, KeyRound, UserMinus, UserPlus, X } from 'lucide-react';
+import { Fragment, useMemo, useState } from 'react';
+import { Plus, KeyRound, UserMinus, UserPlus, Mail, X } from 'lucide-react';
 import { useUsers } from '../hooks/useUsers';
 import { useProperties } from '../hooks/useProperties';
 import { useAuth } from '../hooks/useAuth';
@@ -96,10 +96,10 @@ export function UsersSection() {
     }
   };
 
-  const handleSaveProperties = async (u: ManagedUser, propertyIds: string[]) => {
+  const handleSaveProperties = async (u: ManagedUser, propertyIds: string[], summaryPropertyIds: string[]) => {
     setActionError(null);
     try {
-      const res = await usersApi.setProperties(u.id, propertyIds);
+      const res = await usersApi.setProperties(u.id, propertyIds, summaryPropertyIds);
       if (res.data.success) {
         setEditingProperties(null);
         await reload();
@@ -188,6 +188,7 @@ export function UsersSection() {
                 <th>Email</th>
                 <th>Role</th>
                 <th>Properties</th>
+                <th>Summary email</th>
                 <th>Status</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
@@ -210,6 +211,24 @@ export function UsersSection() {
                         onClick={() => setEditingProperties(u)}>
                         {propNames.length === 0 ? 'None' : propNames.length === properties.length ? 'All' : `${propNames.length} selected`}
                       </button>
+                    </td>
+                    <td>
+                      {u.summaryPropertyIds.length === 0 ? (
+                        <span style={{ color: 'var(--text-muted)' }}>-</span>
+                      ) : (
+                        <span
+                          title={u.summaryPropertyIds
+                            .map((id) => propertyById.get(id))
+                            .filter(Boolean)
+                            .join(', ')}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}
+                        >
+                          <Mail size={14} />
+                          {u.isActive
+                            ? `${u.summaryPropertyIds.length}`
+                            : <em style={{ color: 'var(--text-muted)' }}>paused</em>}
+                        </span>
+                      )}
                     </td>
                     <td>
                       <span className={`badge ${u.isActive ? 'badge-low' : 'badge-high'}`}>
@@ -251,7 +270,7 @@ export function UsersSection() {
           user={editingProperties}
           allProperties={properties.map((p) => ({ id: p.id, name: p.name }))}
           onClose={() => setEditingProperties(null)}
-          onSave={(ids) => handleSaveProperties(editingProperties, ids)}
+          onSave={(ids, summaryIds) => handleSaveProperties(editingProperties, ids, summaryIds)}
         />
       )}
     </div>
@@ -298,27 +317,90 @@ function PropertyAssignmentModal({
   user: ManagedUser;
   allProperties: { id: string; name: string }[];
   onClose: () => void;
-  onSave: (ids: string[]) => Promise<void> | void;
+  onSave: (ids: string[], summaryIds: string[]) => Promise<void> | void;
 }) {
   const [selected, setSelected] = useState<string[]>(user.propertyIds);
+  const [summarySelected, setSummarySelected] = useState<string[]>(user.summaryPropertyIds);
   const [saving, setSaving] = useState(false);
+
+  const toggleAccess = (id: string) => {
+    if (selected.includes(id)) {
+      // Removing access removes the summary with it: the server rejects a summary flag on
+      // an unassigned property, and silently mailing reports about somewhere you cannot
+      // open would be the wrong default anyway.
+      setSelected(selected.filter((x) => x !== id));
+      setSummarySelected(summarySelected.filter((x) => x !== id));
+    } else {
+      setSelected([...selected, id]);
+    }
+  };
+
+  const toggleSummary = (id: string) => {
+    if (summarySelected.includes(id)) {
+      setSummarySelected(summarySelected.filter((x) => x !== id));
+    } else {
+      // Ticking the summary implies access, so grant it rather than failing validation.
+      setSummarySelected([...summarySelected, id]);
+      if (!selected.includes(id)) setSelected([...selected, id]);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onSave(selected);
+      await onSave(selected, summarySelected);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <ModalShell onClose={onClose} title={`Properties for ${user.fullName}`}>
-      <PropertyMultiSelect
-        allProperties={allProperties}
-        selectedIds={selected}
-        onChange={setSelected}
-      />
+    <ModalShell onClose={onClose} title={`Access for ${user.fullName}`}>
+      {allProperties.length === 0 ? (
+        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No properties exist yet.</div>
+      ) : (
+        <>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 70px 90px',
+            gap: '6px 8px',
+            alignItems: 'center',
+            fontSize: 13,
+          }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Property</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>Access</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>Summary email</div>
+            {allProperties.map((p) => (
+              <Fragment key={p.id}>
+                <div>{p.name}</div>
+                <div style={{ textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    aria-label={`Access to ${p.name}`}
+                    checked={selected.includes(p.id)}
+                    onChange={() => toggleAccess(p.id)}
+                  />
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    aria-label={`Email ${user.fullName} the summary for ${p.name}`}
+                    checked={summarySelected.includes(p.id)}
+                    onChange={() => toggleSummary(p.id)}
+                  />
+                </div>
+              </Fragment>
+            ))}
+          </div>
+          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 12, lineHeight: 1.5 }}>
+            Recipients are worked out when each report is sent, so deactivating this user or
+            removing a property stops their email straight away.
+            {!user.isActive && (
+              <><br /><strong>This user is inactive, so they receive nothing right now.</strong></>
+            )}
+          </p>
+        </>
+      )}
       <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" onClick={handleSave} disabled={saving}>

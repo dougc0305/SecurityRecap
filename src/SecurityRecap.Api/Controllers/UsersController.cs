@@ -97,7 +97,22 @@ public class UsersController : BaseApiController
         var tenantId = GetTenantId();
         try
         {
-            var summary = await _users.ReplacePropertiesAsync(tenantId, id, request.PropertyIds ?? Array.Empty<Guid>());
+            var propertyIds = request.PropertyIds ?? Array.Empty<Guid>();
+            var summaryIds = request.SummaryPropertyIds ?? Array.Empty<Guid>();
+
+            // Refuse to mail someone about a property they cannot open. Without this the
+            // summary flag would quietly become a second, invisible access path.
+            var orphaned = summaryIds.Except(propertyIds).ToList();
+            if (orphaned.Count > 0)
+                return BadRequest(ApiResponse<UserDto>.Fail(
+                    "A user can only receive summaries for properties they are assigned to."));
+
+            var assignments = propertyIds
+                .Distinct()
+                .Select(pid => new PropertyAssignment(pid, summaryIds.Contains(pid)))
+                .ToList();
+
+            var summary = await _users.ReplacePropertiesAsync(tenantId, id, assignments);
             return Ok(ApiResponse<UserDto>.Ok(ToDto(summary)));
         }
         catch (KeyNotFoundException ex)
@@ -130,5 +145,6 @@ public class UsersController : BaseApiController
     }
 
     private static UserDto ToDto(UserSummary s) => new(
-        s.Id, s.Email, s.FullName, s.Role.ToString(), s.IsActive, s.MustChangePassword, s.CreatedAt, s.PropertyIds);
+        s.Id, s.Email, s.FullName, s.Role.ToString(), s.IsActive, s.MustChangePassword, s.CreatedAt,
+        s.PropertyIds, s.SummaryPropertyIds);
 }

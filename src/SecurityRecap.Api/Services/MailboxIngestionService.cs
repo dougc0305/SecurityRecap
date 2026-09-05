@@ -300,16 +300,12 @@ public class MailboxIngestionService : IMailboxIngestionService
         IngestionOutcome result,
         CancellationToken ct)
     {
-        var recipients = config.SummaryRecipients
-            .Where(r => !string.IsNullOrWhiteSpace(r))
-            .Select(r => r.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var recipients = await ResolveRecipientsAsync(config, ct);
 
         if (recipients.Count == 0)
         {
             _logger.LogWarning(
-                "Summary email is enabled for property {PropertyId} but no recipients are configured",
+                "Summary email is enabled for property {PropertyId} but no recipients resolved",
                 config.PropertyId);
             return;
         }
@@ -335,6 +331,40 @@ public class MailboxIngestionService : IMailboxIngestionService
         _logger.LogInformation(
             "Sent summary for report {ReportId} to {RecipientCount} recipient(s)",
             result.ReportId, recipients.Count);
+    }
+
+    /// <summary>
+    /// Works out who gets this property's summary, at send time rather than from a stored list.
+    /// Deactivating a user or removing their property assignment therefore stops their mail on
+    /// the very next report, with no list to remember to prune.
+    /// </summary>
+    private async Task<List<string>> ResolveRecipientsAsync(MailboxIngestConfig config, CancellationToken ct)
+    {
+        var fromUsers = await _db.UserProperties
+            .Where(up => up.PropertyId == config.PropertyId
+                && up.ReceivesSummary
+                && up.User.IsActive
+                && up.User.TenantId == config.Property.TenantId
+                && up.User.Email != null)
+            .Select(up => up.User.Email!)
+            .ToListAsync(ct);
+
+        // External recipients are for people who need the report but have no account —
+        // a management company contact, say — so they are additive, not a fallback.
+        var external = config.SummaryRecipients ?? Array.Empty<string>();
+
+        var recipients = fromUsers
+            .Concat(external)
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .Select(r => r.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        _logger.LogInformation(
+            "Resolved {Total} summary recipient(s) for property {PropertyId}: {UserCount} from user accounts, {ExternalCount} external",
+            recipients.Count, config.PropertyId, fromUsers.Count, external.Length);
+
+        return recipients;
     }
 
     private static string BuildEmailBody(IngestionOutcome result)

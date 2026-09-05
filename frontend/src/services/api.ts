@@ -85,8 +85,8 @@ export const usersApi = {
     api.put<ApiResponse<ManagedUser>>(`/v1/users/${id}`, data),
   setActive: (id: string, isActive: boolean) =>
     api.put<ApiResponse<ManagedUser>>(`/v1/users/${id}/active`, { isActive }),
-  setProperties: (id: string, propertyIds: string[]) =>
-    api.put<ApiResponse<ManagedUser>>(`/v1/users/${id}/properties`, { propertyIds }),
+  setProperties: (id: string, propertyIds: string[], summaryPropertyIds: string[]) =>
+    api.put<ApiResponse<ManagedUser>>(`/v1/users/${id}/properties`, { propertyIds, summaryPropertyIds }),
   resetPassword: (id: string) =>
     api.post<ApiResponse<ResetPasswordResponse>>(`/v1/users/${id}/reset-password`),
 };
