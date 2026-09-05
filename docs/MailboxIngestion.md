@@ -58,10 +58,14 @@ alongside the current one during changeover).
 ### Restrict the app to one mailbox
 
 `Mail.Read` as an application permission grants access to *every* mailbox in the tenant by
-default — including yours. Scope it down before going live. The simplest option is an
-application access policy (Exchange Online PowerShell); `-PolicyScopeGroupId` accepts the
-shared mailbox directly, though pointing it at a mail-enabled security group makes adding a
-second property later a group membership change rather than a new policy:
+default — including yours. Scope it down before going live, with an application access policy
+(Exchange Online PowerShell).
+
+**Scope the policy to a mail-enabled security group, not to the mailbox itself.** Pointing
+`-PolicyScopeGroupId` straight at a shared mailbox can fail with *"The identity of the policy
+scope is not a security principal"* — the parameter needs a target with a SID, and a shared
+mailbox does not reliably present one. A mail-enabled security group always works, and adding
+a second property later becomes a membership change rather than a new policy.
 
 These cmdlets do not exist in a bare PowerShell session — they arrive with the Exchange
 Online module, and only after connecting. One-time install, then connect (opens an interactive
@@ -72,19 +76,34 @@ Install-Module ExchangeOnlineManagement -Scope CurrentUser -Force
 Connect-ExchangeOnline -UserPrincipalName <your-admin-upn>
 ```
 
+Create the group (`-Type Security` is what makes it security-enabled — a plain distribution
+group is not a security principal and fails the same way), then scope the policy to it:
+
+```powershell
+New-DistributionGroup `
+  -Name "SecurityRecap Mailboxes" `
+  -Alias securityrecap-mailboxes `
+  -Type Security `
+  -PrimarySmtpAddress securityrecap-mailboxes@example.com `
+  -Members reports@example.com
+```
+
 ```powershell
 New-ApplicationAccessPolicy `
   -AppId <application-client-id> `
-  -PolicyScopeGroupId reports@example.com `
+  -PolicyScopeGroupId securityrecap-mailboxes@example.com `
   -AccessRight RestrictAccess `
   -Description "SecurityRecap patrol report pickup"
 ```
+
+A new group takes a few minutes to become usable as a policy scope.
 
 Verify it took effect — and, more importantly, that a mailbox outside the policy is refused:
 
 ```powershell
 Test-ApplicationAccessPolicy -Identity reports@example.com -AppId <application-client-id>
 Test-ApplicationAccessPolicy -Identity <some-other-mailbox> -AppId <application-client-id>
+# Test against the mailboxes, not the group.
 ```
 
 Expect `Granted` then `Denied`. The second check is the one worth running: it is what
@@ -95,8 +114,8 @@ immediately after creating the policy may just be stale — re-run it before con
 policy is wrong. Run `Disconnect-ExchangeOnline` when finished.
 
 Exchange Online also offers **RBAC for Applications**, which scopes app permissions more
-granularly (and is what Microsoft now steers people toward). Application access policies still
-work and are less setup; either is fine for a single mailbox.
+granularly (and is what Microsoft now steers people toward). It is more setup, but it is the
+fallback if application access policies will not bind in your tenant.
 
 ## Configure the property
 
