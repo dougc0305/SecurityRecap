@@ -63,6 +63,15 @@ application access policy (Exchange Online PowerShell); `-PolicyScopeGroupId` ac
 shared mailbox directly, though pointing it at a mail-enabled security group makes adding a
 second property later a group membership change rather than a new policy:
 
+These cmdlets do not exist in a bare PowerShell session — they arrive with the Exchange
+Online module, and only after connecting. One-time install, then connect (opens an interactive
+browser sign-in; requires Exchange Administrator or Global Administrator):
+
+```powershell
+Install-Module ExchangeOnlineManagement -Scope CurrentUser -Force
+Connect-ExchangeOnline -UserPrincipalName <your-admin-upn>
+```
+
 ```powershell
 New-ApplicationAccessPolicy `
   -AppId <application-client-id> `
@@ -71,13 +80,19 @@ New-ApplicationAccessPolicy `
   -Description "SecurityRecap patrol report pickup"
 ```
 
-Verify it took effect:
+Verify it took effect — and, more importantly, that a mailbox outside the policy is refused:
 
 ```powershell
 Test-ApplicationAccessPolicy -Identity reports@example.com -AppId <application-client-id>
+Test-ApplicationAccessPolicy -Identity <some-other-mailbox> -AppId <application-client-id>
 ```
 
-Policy changes can take up to an hour to propagate.
+Expect `Granted` then `Denied`. The second check is the one worth running: it is what
+demonstrates the app cannot read every mailbox in the tenant.
+
+Policy changes can take up to an hour to propagate, so a `Granted` on the second check
+immediately after creating the policy may just be stale — re-run it before concluding the
+policy is wrong. Run `Disconnect-ExchangeOnline` when finished.
 
 Exchange Online also offers **RBAC for Applications**, which scopes app permissions more
 granularly (and is what Microsoft now steers people toward). Application access policies still
