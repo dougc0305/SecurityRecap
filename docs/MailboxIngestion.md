@@ -37,10 +37,31 @@ App-only (client credentials) access, so nothing depends on a signed-in user.
    Then **Grant admin consent**. No directory permissions are needed: **Test connection**
    reads the configured mail folder, so it exercises the same permission polling uses.
 
+### Shared mailbox vs. licensed mailbox
+
+Use a **shared mailbox**. App-only Graph access does not care whether the mailbox is licensed,
+and a shared mailbox is free, has no password to rotate, and has sign-in blocked on its
+underlying account — which is exactly what you want for something only a daemon reads.
+
+- 50 GB without a license. Only add an Exchange Online Plan 2 license if you exceed that or
+  need archiving / litigation hold.
+- Sign-in being blocked on the account is irrelevant here. It would only matter for delegated
+  or password-based access (IMAP, ROPC); client credentials do not sign a user in.
+- A **distribution list will not work** — it has no mailbox to read. It must be a shared or
+  user mailbox.
+- If the summary email is enabled, it is sent *from* this mailbox and lands in its Sent Items,
+  so pick an address the board will recognise as the sender.
+
+Have the security vendor deliver the report to this address (or add it as an extra recipient
+alongside the current one during changeover).
+
 ### Restrict the app to one mailbox
 
 `Mail.Read` as an application permission grants access to *every* mailbox in the tenant by
-default. Scope it down with an application access policy (Exchange Online PowerShell):
+default — including yours. Scope it down before going live. The simplest option is an
+application access policy (Exchange Online PowerShell); `-PolicyScopeGroupId` accepts the
+shared mailbox directly, though pointing it at a mail-enabled security group makes adding a
+second property later a group membership change rather than a new policy:
 
 ```powershell
 New-ApplicationAccessPolicy `
@@ -57,6 +78,10 @@ Test-ApplicationAccessPolicy -Identity reports@example.com -AppId <application-c
 ```
 
 Policy changes can take up to an hour to propagate.
+
+Exchange Online also offers **RBAC for Applications**, which scopes app permissions more
+granularly (and is what Microsoft now steers people toward). Application access policies still
+work and are less setup; either is fine for a single mailbox.
 
 ## Configure the property
 
@@ -115,7 +140,7 @@ dotnet ef database update -p src/SecurityRecap.Infrastructure -s src/SecurityRec
 | --- | --- |
 | "Microsoft Entra rejected the app credentials" | Wrong tenant/client id, or an expired client secret. |
 | "Microsoft Graph denied access to the mailbox" | Admin consent not granted, or an application access policy that excludes this mailbox. |
-| "could not find that mailbox" | Address is not a real licensed mailbox. |
+| "could not find that mailbox" | Address does not resolve to a mailbox in this tenant. A shared mailbox is fine; a distribution list is not (it has no mailbox to read). |
 | "could not find that mail folder" | Folder name is wrong. Use a well-known name (`inbox`, `archive`) or a folder id. |
 | Poll succeeds but ingests nothing | Filters too narrow, or the watermark has already passed the message. Widen the filters and re-check. |
 | "The stored client secret could not be decrypted" | The Data Protection key ring was lost — usually `DataProtection:KeyPath` unset before a deploy. Re-enter the client secret. |

@@ -188,7 +188,8 @@ public class GraphMailboxClient : IMailboxClient
                 + "Mail.Read (and Mail.Send, if summary email is enabled) application permission with admin consent, "
                 + "and that any application access policy includes this mailbox. Graph said: " + detail,
             MailboxFailureKind.MailboxNotFound =>
-                "Microsoft Graph could not find that mailbox. Check the address is a real, licensed mailbox. Graph said: " + detail,
+                "Microsoft Graph could not find that mailbox. Check the address resolves to a mailbox in this "
+                + "tenant; a shared mailbox is fine and does not need a license. Graph said: " + detail,
             MailboxFailureKind.FolderNotFound =>
                 "Microsoft Graph could not find that mail folder. Graph said: " + detail,
             MailboxFailureKind.Throttled =>
