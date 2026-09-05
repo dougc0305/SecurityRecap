@@ -4,7 +4,7 @@ import { useProperties } from '../hooks/useProperties';
 import { useAuth } from '../hooks/useAuth';
 import { reportsApi, ingestApi } from '../services/api';
 import type { Report } from '../types/api';
-import { Upload, ChevronLeft, ChevronRight, FileText, Eye } from 'lucide-react';
+import { Upload, ChevronLeft, ChevronRight, FileText, FileDown, Eye } from 'lucide-react';
 import { canIngestReports } from '../utils/authorization';
 
 export function ReportsPage() {
@@ -75,6 +75,16 @@ export function ReportsPage() {
     }
   };
 
+  const downloadSummary = async (reportId: string, reportDate: string) => {
+    const res = await reportsApi.getSummaryBlob(reportId);
+    const url = URL.createObjectURL(res.data);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `summary-${reportDate}.md`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize);
 
   return (
@@ -130,8 +140,8 @@ export function ReportsPage() {
           ) : (
             <p style={{ color: 'var(--text-muted)' }}>No AI summary available.</p>
           )}
-          {selectedReport.rawPdfUrl && (
-            <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {selectedReport.rawPdfUrl && (
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -144,8 +154,17 @@ export function ReportsPage() {
               >
                 <FileText size={16} /> Download Original PDF
               </button>
-            </div>
-          )}
+            )}
+            {selectedReport.mdSummaryUrl && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => downloadSummary(selectedReport.id, selectedReport.reportDate)}
+              >
+                <FileDown size={16} /> Download Summary (.md)
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="card">
@@ -166,6 +185,7 @@ export function ReportsPage() {
                       <th>Officers</th>
                       <th>Summary</th>
                       <th>PDF</th>
+                      <th>Summary file</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -189,6 +209,19 @@ export function ReportsPage() {
                               }}
                             >
                               <FileText size={16} />
+                            </button>
+                          ) : '-'}
+                        </td>
+                        <td>
+                          {r.mdSummaryUrl ? (
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ padding: '4px 10px' }}
+                              title="Download summary file"
+                              onClick={() => downloadSummary(r.id, r.reportDate)}
+                            >
+                              <FileDown size={16} />
                             </button>
                           ) : '-'}
                         </td>

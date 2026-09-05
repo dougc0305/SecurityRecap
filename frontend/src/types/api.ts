@@ -109,9 +109,82 @@ export interface Report {
   periodStart: string | null;
   periodEnd: string | null;
   rawPdfUrl: string | null;
+  mdSummaryUrl: string | null;
   aiSummaryHtml: string | null;
   officerNames: string[];
   createdAt: string;
+}
+
+export interface MailboxIngestConfig {
+  propertyId: string;
+  graphTenantId: string;
+  graphClientId: string;
+  hasClientSecret: boolean;
+  mailboxAddress: string;
+  folderName: string;
+  fromAddress: string | null;
+  subjectContains: string | null;
+  attachmentNameContains: string | null;
+  lookbackDays: number;
+  pollIntervalMinutes: number;
+  markAsRead: boolean;
+  moveToFolder: string | null;
+  sendSummaryEmail: boolean;
+  summaryRecipients: string[];
+  summarySubjectPrefix: string | null;
+  isEnabled: boolean;
+  lastPolledAt: string | null;
+  lastSuccessAt: string | null;
+  lastMessageReceivedAt: string | null;
+  lastError: string | null;
+  consecutiveFailures: number;
+}
+
+export interface SaveMailboxIngestConfigRequest {
+  propertyId: string;
+  graphTenantId: string;
+  graphClientId: string;
+  /** Omit to keep the stored secret; supply a value to replace it. */
+  graphClientSecret?: string | null;
+  mailboxAddress: string;
+  folderName: string;
+  fromAddress: string | null;
+  subjectContains: string | null;
+  attachmentNameContains: string | null;
+  lookbackDays: number;
+  pollIntervalMinutes: number;
+  markAsRead: boolean;
+  moveToFolder: string | null;
+  sendSummaryEmail: boolean;
+  summaryRecipients: string[];
+  summarySubjectPrefix: string | null;
+  isEnabled: boolean;
+}
+
+export interface MailboxMessageOutcome {
+  subject: string;
+  fromAddress: string;
+  receivedAtUtc: string;
+  fileName: string | null;
+  reportId: string | null;
+  alreadyIngested: boolean;
+  summaryEmailSent: boolean;
+  error: string | null;
+}
+
+export interface MailboxPollResult {
+  propertyId: string;
+  propertyName: string;
+  succeeded: boolean;
+  messagesExamined: number;
+  reportsIngested: number;
+  messagesSkipped: number;
+  messages: MailboxMessageOutcome[];
+  error: string | null;
+}
+
+export interface MailboxVerifyResult {
+  mailbox: string;
 }
 
 export interface Incident {

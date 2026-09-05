@@ -6,6 +6,7 @@ import { Plus } from 'lucide-react';
 import { formatRoleLabel, isAdmin } from '../utils/authorization';
 import { UsersSection } from '../components/UsersSection';
 import { ApiKeysSection } from '../components/ApiKeysSection';
+import { MailboxIngestSection } from '../components/MailboxIngestSection';
 import { Link } from 'react-router-dom';
 
 export function SettingsPage() {
@@ -65,6 +66,7 @@ export function SettingsPage() {
       </div>
 
       {canManageProperties && <UsersSection />}
+      {canManageProperties && <MailboxIngestSection />}
       {canManageProperties && <ApiKeysSection />}
 
       <div className="card">

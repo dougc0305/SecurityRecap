@@ -78,6 +78,15 @@ location, notice_issued (bool), tow_notified (bool), created_at
 id, property_id (FK), address, label, incident_count, 
 first_flagged, last_incident, notes
 
+### mailbox_ingest_configs
+id, property_id (FK, unique), graph_tenant_id, graph_client_id,
+graph_client_secret_protected (Data Protection, never returned over the API),
+mailbox_address, folder_name, from_address, subject_contains,
+attachment_name_contains, lookback_days, poll_interval_minutes, mark_as_read,
+move_to_folder, send_summary_email, summary_recipients[], summary_subject_prefix,
+is_enabled, last_polled_at, last_success_at, last_message_received_at,
+last_error, consecutive_failures, created_at
+
 ### users
 id, tenant_id (FK), email, full_name, role (admin/board_member/viewer),
 is_active, created_at
@@ -101,6 +110,13 @@ POST /api/auth/refresh
 ### Ingest
 POST /api/ingest/report  ← receives PDF + property_id, runs full pipeline
 
+### Mailbox Ingest (admin-only)
+GET    /api/v1/mailbox-ingest/{propertyId}
+PUT    /api/v1/mailbox-ingest
+DELETE /api/v1/mailbox-ingest/{propertyId}
+POST   /api/v1/mailbox-ingest/{propertyId}/verify  ← test Graph credentials
+POST   /api/v1/mailbox-ingest/{propertyId}/poll    ← run a poll immediately
+
 ### Properties
 GET    /api/properties
 POST   /api/properties
@@ -110,6 +126,8 @@ PUT    /api/properties/{id}
 ### Reports
 GET    /api/reports?propertyId=&page=&pageSize=
 GET    /api/reports/{id}
+GET    /api/v1/reports/{id}/pdf      ← original PDF
+GET    /api/v1/reports/{id}/summary  ← generated Markdown summary file
 
 ### Incidents
 GET    /api/incidents?propertyId=&type=&severity=&from=&to=&page=&pageSize=
@@ -126,14 +144,20 @@ Located at: src/SecurityRecap.Api/Prompts/IngestionPrompt.cs
 
 The ingestion prompt receives:
 - The PDF as base64
-- Last 30 days of incidents as JSON history context
+- The property's history as JSON, built by ReportHistoryContextBuilder: 90 days of incidents,
+  counts by type over 7/30/90 days, repeat addresses, repeat vehicles, average incidents per
+  report, and days since the last high/urgent incident
 
 It returns a JSON object with:
 - incidents[]
 - vehicles[]
 - maintenance_issues[]
-- pattern_matches[]
+- pattern_matches[]      (with first_observed, occurrence_count, significance)
+- anomalies[]            (expected-but-absent activity, values outside the norm)
+- data_quality_notes[]   (internal contradictions in the source PDF)
+- urgent_items[]
 - html_summary (HTML string, no html/body tags)
+- markdown_summary (stored as the report's summary file, md_summary_url)
 
 ## Claude API — Chat Prompt
 Located at: src/SecurityRecap.Api/Prompts/ChatPrompt.cs
@@ -154,6 +178,19 @@ The chat prompt receives:
 - /chat               ← AI chat interface
 - /settings           ← property and user management
 
+## Automated Report Pickup
+Patrol report emails are picked up from a mailbox via Microsoft Graph (app-only) and pushed
+through the same IIngestionService path as a manual upload. See docs/MailboxIngestion.md for
+the Entra app registration, per-property setup, and deployment prerequisites.
+
+- MailboxPollingBackgroundService ticks on MailboxIngest:TickIntervalSeconds and polls each
+  property whose own poll_interval_minutes has elapsed; failures back off exponentially.
+- Idempotency: report external_id is `graph:{internetMessageId}:{fileName}`.
+- The poller has no signed-in user; it calls IngestReportAsync with the property's own
+  tenant_id, Guid.Empty user id, and UserRole.Admin.
+- Integration secrets use ISecretProtector (ASP.NET Data Protection), NOT the one-way hashing
+  used for passwords and API keys, because they must be replayed to Graph.
+
 ## Environment Variables (.env / appsettings)
 - ConnectionStrings__DefaultConnection  (PostgreSQL)
 - Anthropic__ApiKey
@@ -163,10 +200,16 @@ The chat prompt receives:
 - Jwt__Issuer
 - Jwt__Audience
 - Email__SmtpHost / Email__SmtpPort / Email__FromAddress
+- DataProtection__KeyPath        (MUST be outside the deploy root — deploy.bat moves it)
+- LocalStorage__RootPath         (MUST be outside the deploy root — deploy.bat moves it)
+- MailboxIngest__Enabled / MailboxIngest__TickIntervalSeconds
 
 ## Development Notes
 - Use docker-compose for local PostgreSQL on port 5432
 - EF Core migrations via dotnet ef
 - Vite dev server proxies /api to .NET backend
-- All dates stored and returned as UTC
+- All dates stored and returned as UTC. Patrol reports carry local times with an offset, so
+  parse with AdjustToUniversal|AssumeUniversal — relabelling a local time as UTC shifts every
+  incident and corrupts the history comparison windows.
+- Migrations run automatically only in Development (DbSeeder). Apply them to production by hand.
 - Property timezone used only for display formatting

@@ -21,6 +21,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<ServiceAssignment> ServiceAssignments => Set<ServiceAssignment>();
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+    public DbSet<MailboxIngestConfig> MailboxIngestConfigs => Set<MailboxIngestConfig>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -146,6 +147,16 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             e.HasIndex(a => a.KeyHash).IsUnique();
             e.HasIndex(a => a.TenantId);
             e.Property(a => a.CreatedAt).HasDefaultValueSql("now()");
+        });
+
+        // MailboxIngestConfig (per-property automated report pickup)
+        builder.Entity<MailboxIngestConfig>(e =>
+        {
+            e.HasKey(m => m.Id);
+            e.Property(m => m.Id).HasDefaultValueSql("gen_random_uuid()");
+            e.HasOne(m => m.Property).WithOne().HasForeignKey<MailboxIngestConfig>(m => m.PropertyId);
+            e.HasIndex(m => m.PropertyId).IsUnique();
+            e.Property(m => m.CreatedAt).HasDefaultValueSql("now()");
         });
 
         // ServiceAssignment (cross-tenant property visibility for management/security companies)

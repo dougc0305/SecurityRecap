@@ -25,8 +25,29 @@ public class IngestionResult
     [JsonPropertyName("pattern_matches")]
     public List<IngestionPatternMatch> PatternMatches { get; set; } = new();
 
+    [JsonPropertyName("anomalies")]
+    public List<IngestionAnomaly> Anomalies { get; set; } = new();
+
+    [JsonPropertyName("data_quality_notes")]
+    public List<string> DataQualityNotes { get; set; } = new();
+
+    [JsonPropertyName("urgent_items")]
+    public List<string> UrgentItems { get; set; } = new();
+
     [JsonPropertyName("html_summary")]
     public string HtmlSummary { get; set; } = string.Empty;
+
+    [JsonPropertyName("markdown_summary")]
+    public string? MarkdownSummary { get; set; }
+}
+
+public class IngestionAnomaly
+{
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = string.Empty;
+
+    [JsonPropertyName("evidence")]
+    public string? Evidence { get; set; }
 }
 
 public class IngestionIncident
@@ -99,6 +120,15 @@ public class IngestionPatternMatch
 
     [JsonPropertyName("related_incidents")]
     public List<string> RelatedIncidents { get; set; } = new();
+
+    [JsonPropertyName("first_observed")]
+    public string? FirstObserved { get; set; }
+
+    [JsonPropertyName("occurrence_count")]
+    public int OccurrenceCount { get; set; }
+
+    [JsonPropertyName("significance")]
+    public string? Significance { get; set; }
 
     [JsonPropertyName("recommendation")]
     public string Recommendation { get; set; } = string.Empty;
