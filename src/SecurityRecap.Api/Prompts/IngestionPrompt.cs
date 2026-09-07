@@ -9,8 +9,9 @@ public static class IngestionPrompt
         security patrol report. Analyze it thoroughly, extract all structured data, and compare
         what you find against the property's history.
 
-        Here is the property's history for context. It covers the last 90 days of incidents plus
-        aggregate counts, repeat addresses, and repeat vehicles:
+        Here is the property's history for context. It covers the last 90 days of incidents,
+        aggregate counts, repeat addresses, and every licence plate already on file with the
+        number of violations previously recorded against it:
         {{propertyHistoryJson}}
 
         Use that history actively. A reader who gets this summary every day already knows what a
@@ -26,6 +27,18 @@ public static class IngestionPrompt
           say so plainly rather than padding.
         - Report internal inconsistencies in the source document, such as a log entry whose
           timestamp contradicts its attached photo timestamps.
+
+        Licence plates need particular care, because a repeat vehicle is the single most
+        actionable thing in these reports:
+        - For every plate in this report, look it up in known_vehicles from the history above.
+        - If it is there, say so and give the numbers from the history verbatim: how many prior
+          violations, and the date first seen. Do not estimate or recompute these.
+        - If it is not there, say plainly that it is the first time this tag has been recorded.
+        - Never describe an unreadable tag as a repeat offender. Values like UNKNOWN, N/A, NONE
+          or a blank plate are not licence plates; treat each as a separate unidentified vehicle
+          and do not attach history to it.
+        - prior_violation_count in the history is the count BEFORE this report. If the same plate
+          appears again here, this sighting is that number plus one.
 
         Return a JSON object with the following structure:
         {
@@ -46,13 +59,16 @@ public static class IngestionPrompt
             ],
             "vehicles": [
                 {
-                    "plate_number": "string",
+                    "plate_number": "string, or UNKNOWN when the tag is not readable",
                     "plate_state": "string",
                     "make": "string",
                     "model": "string",
                     "color": "string",
                     "violation_type": "string",
-                    "location": "string"
+                    "location": "string",
+                    "seen_before": "true if this plate appears in known_vehicles, false if it does not, null if the plate is unreadable",
+                    "prior_violation_count": "the plate's prior_violation_count from the history, or 0 when it is new, or null when unreadable",
+                    "first_seen": "the plate's first_seen date from the history as YYYY-MM-DD, or null"
                 }
             ],
             "maintenance_issues": [
@@ -100,6 +116,9 @@ public static class IngestionPrompt
         ## Routine Activities Completed
         ## Incidents             (say "No incidents reported." when there are none)
         ## Parking Violations
+                                 (list each plate with its history: "first time recorded", or
+                                 "4th violation, first seen 2026-05-04". Unreadable tags are
+                                 listed as unidentified with no history claim.)
         ## Maintenance Issues
         ## Safety Concerns
         ## Additional Notes      (data quality findings go here)

@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SecurityRecap.Api.DTOs;
 using SecurityRecap.Api.Prompts;
+using SecurityRecap.Core;
 using SecurityRecap.Core.Entities;
 using SecurityRecap.Core.Enums;
 using SecurityRecap.Core.Interfaces;
@@ -174,7 +175,36 @@ public class IngestionService : IIngestionService
             if (string.IsNullOrWhiteSpace(veh.PlateNumber))
                 continue;
 
-            var plateNormalized = veh.PlateNumber.Trim().ToUpperInvariant();
+            var plateNormalized = PlateNumber.Normalize(veh.PlateNumber);
+
+            // An unreadable tag ("UNKNOWN", "N/A") is not a vehicle. Recording it as one
+            // collects every illegible plate on the property into a single row that then
+            // looks like a serial offender, and poisons the repeat-plate history. The
+            // violation is still recorded, just without a vehicle attached.
+            if (!PlateNumber.IsTrackable(plateNormalized))
+            {
+                _logger.LogInformation(
+                    "Plate '{Plate}' is not a trackable tag; recording the violation without a vehicle",
+                    plateNormalized);
+
+                if (!string.IsNullOrWhiteSpace(veh.ViolationType))
+                {
+                    var unlinkedIncident = ResolveViolationIncident(createdIncidents, veh.Location);
+                    if (unlinkedIncident is not null)
+                    {
+                        _db.Violations.Add(new Violation
+                        {
+                            Id = Guid.NewGuid(),
+                            IncidentId = unlinkedIncident.Id,
+                            VehicleId = null,
+                            ViolationType = veh.ViolationType,
+                            Location = veh.Location
+                        });
+                    }
+                }
+
+                continue;
+            }
 
             // Find existing vehicle or create new
             var vehicle = await _db.Vehicles
