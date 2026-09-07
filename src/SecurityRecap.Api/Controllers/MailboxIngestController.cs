@@ -76,6 +76,20 @@ public class MailboxIngestController : BaseApiController
                     + "or add an external recipient."));
         }
 
+        if (!string.IsNullOrWhiteSpace(request.ScheduleTimeZone))
+        {
+            try { TimeZoneInfo.FindSystemTimeZoneById(request.ScheduleTimeZone.Trim()); }
+            catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+            {
+                return BadRequest(ApiResponse<MailboxIngestConfigDto>.Fail(
+                    $"'{request.ScheduleTimeZone}' is not a recognised timezone. Use an IANA id such as America/New_York."));
+            }
+        }
+
+        if (request.ActiveWindowStart is null != request.ActiveWindowEnd is null)
+            return BadRequest(ApiResponse<MailboxIngestConfigDto>.Fail(
+                "Set both a window start and end, or neither."));
+
         var config = await _db.MailboxIngestConfigs
             .FirstOrDefaultAsync(c => c.PropertyId == request.PropertyId);
 
@@ -99,6 +113,10 @@ public class MailboxIngestController : BaseApiController
         config.LookbackDays = request.LookbackDays;
         config.PollIntervalMinutes = request.PollIntervalMinutes;
         config.StaleAfterHours = request.StaleAfterHours;
+        config.ActiveWindowStart = request.ActiveWindowStart;
+        config.ActiveWindowEnd = request.ActiveWindowEnd;
+        config.ActiveWindowPollMinutes = request.ActiveWindowPollMinutes;
+        config.ScheduleTimeZone = Blank(request.ScheduleTimeZone);
         config.MarkAsRead = request.MarkAsRead;
         config.MoveToFolder = Blank(request.MoveToFolder);
         config.SendSummaryEmail = request.SendSummaryEmail;
@@ -213,6 +231,10 @@ public class MailboxIngestController : BaseApiController
         c.AttachmentNameContains,
         c.LookbackDays,
         c.PollIntervalMinutes,
+        c.ActiveWindowStart,
+        c.ActiveWindowEnd,
+        c.ActiveWindowPollMinutes,
+        c.ScheduleTimeZone,
         c.StaleAfterHours,
         c.MarkAsRead,
         c.MoveToFolder,

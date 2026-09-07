@@ -194,7 +194,12 @@ through the same IIngestionService path as a manual upload. See docs/MailboxInge
 the Entra app registration, per-property setup, and deployment prerequisites.
 
 - MailboxPollingBackgroundService ticks on MailboxIngest:TickIntervalSeconds and polls each
-  property whose own poll_interval_minutes has elapsed; failures back off exponentially.
+  property whose own interval has elapsed; failures back off exponentially.
+- Poll cadence is time-of-day aware: active_window_poll_minutes inside the daily window the
+  report is expected, poll_interval_minutes outside it. The window is evaluated in
+  schedule_time_zone (IANA), which falls back to the property's timezone but is stored
+  separately — the property is where the patrol happens, not necessarily where the sender's
+  schedule is anchored. Palm Cove is America/Chicago while its report is sent on Eastern time.
 - Idempotency: report external_id is `graph:{internetMessageId}:{fileName}`.
 - Failure alerts (MailboxAlertNotifier) email users flagged with receives_alerts when a poll
   fails, a report cannot be processed, or no report has arrived within stale_after_hours.

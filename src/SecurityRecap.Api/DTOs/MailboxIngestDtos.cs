@@ -15,6 +15,10 @@ public record MailboxIngestConfigDto(
     string? AttachmentNameContains,
     int LookbackDays,
     int PollIntervalMinutes,
+    TimeOnly? ActiveWindowStart,
+    TimeOnly? ActiveWindowEnd,
+    int ActiveWindowPollMinutes,
+    string? ScheduleTimeZone,
     int StaleAfterHours,
     bool MarkAsRead,
     string? MoveToFolder,
@@ -65,6 +69,18 @@ public class SaveMailboxIngestConfigRequest
 
     [Range(1, 1440, ErrorMessage = "Poll interval must be between 1 minute and 24 hours")]
     public int PollIntervalMinutes { get; set; } = 15;
+
+    /// <summary>Start of the daily window when the report is expected, in ScheduleTimeZone.</summary>
+    public TimeOnly? ActiveWindowStart { get; set; }
+
+    /// <summary>End of that window. May wrap past midnight.</summary>
+    public TimeOnly? ActiveWindowEnd { get; set; }
+
+    [Range(1, 1440, ErrorMessage = "Active window interval must be between 1 minute and 24 hours")]
+    public int ActiveWindowPollMinutes { get; set; } = 5;
+
+    /// <summary>IANA timezone for the window. Falls back to the property's timezone when blank.</summary>
+    public string? ScheduleTimeZone { get; set; }
 
     /// <summary>Alert when no report has arrived for this many hours. Zero disables the check.</summary>
     [Range(0, 720, ErrorMessage = "Stale threshold must be between 0 and 720 hours")]

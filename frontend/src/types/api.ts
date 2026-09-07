@@ -131,6 +131,10 @@ export interface MailboxIngestConfig {
   attachmentNameContains: string | null;
   lookbackDays: number;
   pollIntervalMinutes: number;
+  activeWindowStart: string | null;
+  activeWindowEnd: string | null;
+  activeWindowPollMinutes: number;
+  scheduleTimeZone: string | null;
   staleAfterHours: number;
   markAsRead: boolean;
   moveToFolder: string | null;
@@ -160,6 +164,10 @@ export interface SaveMailboxIngestConfigRequest {
   attachmentNameContains: string | null;
   lookbackDays: number;
   pollIntervalMinutes: number;
+  activeWindowStart: string | null;
+  activeWindowEnd: string | null;
+  activeWindowPollMinutes: number;
+  scheduleTimeZone: string | null;
   staleAfterHours: number;
   markAsRead: boolean;
   moveToFolder: string | null;
