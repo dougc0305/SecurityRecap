@@ -20,6 +20,12 @@ public record MailboxQuery(
 
 public record MailboxAttachment(string Name, byte[] Content);
 
+/// <summary>
+/// Attachment metadata without the bytes. Listing is cheap; downloading a report PDF is not,
+/// so the two are separate calls and the caller decides whether the content is worth fetching.
+/// </summary>
+public record MailboxAttachmentInfo(string Id, string Name, long Size);
+
 public record MailboxMessage(
     string Id,
     string InternetMessageId,
@@ -45,11 +51,17 @@ public interface IMailboxClient
         MailboxCredentials credentials, MailboxQuery query, CancellationToken ct = default);
 
     /// <summary>
-    /// Downloads a message's PDF attachments. Separate from listing so a poll that matches
-    /// nothing never pays to transfer attachment bytes.
+    /// Lists a message's PDF attachments without transferring their content.
     /// </summary>
-    Task<IReadOnlyList<MailboxAttachment>> FetchPdfAttachmentsAsync(
+    Task<IReadOnlyList<MailboxAttachmentInfo>> ListPdfAttachmentsAsync(
         MailboxCredentials credentials, string messageId, string? nameContains, CancellationToken ct = default);
+
+    /// <summary>
+    /// Downloads one attachment's bytes. Kept apart from listing so the caller can skip the
+    /// transfer for an attachment it has already ingested.
+    /// </summary>
+    Task<MailboxAttachment> DownloadAttachmentAsync(
+        MailboxCredentials credentials, string messageId, MailboxAttachmentInfo attachment, CancellationToken ct = default);
 
     Task MarkAsReadAsync(MailboxCredentials credentials, string messageId, CancellationToken ct = default);
 

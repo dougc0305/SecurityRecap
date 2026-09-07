@@ -292,10 +292,10 @@ public class GraphMailboxClient : IMailboxClient
     }
 
     /// <summary>
-    /// Downloads the PDF attachments for one message. Kept separate from listing so a poll
-    /// that matches nothing never pays to transfer attachment bytes.
+    /// Lists a message's PDF attachments. Metadata only — $select omits contentBytes, so this
+    /// stays cheap regardless of how large the attachments are.
     /// </summary>
-    public async Task<IReadOnlyList<MailboxAttachment>> FetchPdfAttachmentsAsync(
+    public async Task<IReadOnlyList<MailboxAttachmentInfo>> ListPdfAttachmentsAsync(
         MailboxCredentials credentials, string messageId, string? nameContains, CancellationToken ct = default)
     {
         var listUrl = $"{GraphBase}/users/{Encode(credentials.MailboxAddress)}/messages/{Encode(messageId)}/attachments"
@@ -307,7 +307,7 @@ public class GraphMailboxClient : IMailboxClient
 
         using var doc = JsonDocument.Parse(await listResponse.Content.ReadAsStringAsync(ct));
 
-        var attachments = new List<MailboxAttachment>();
+        var attachments = new List<MailboxAttachmentInfo>();
         foreach (var item in doc.RootElement.GetProperty("value").EnumerateArray())
         {
             var odataType = item.TryGetProperty("@odata.type", out var t) ? t.GetString() : null;
@@ -325,22 +325,31 @@ public class GraphMailboxClient : IMailboxClient
                 && !name.Contains(nameContains, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var attachmentId = item.GetProperty("id").GetString()!;
-
-            // $value streams the raw bytes and works above the ~3 MB inline contentBytes
-            // threshold, so it is used for every size.
-            var valueUrl = $"{GraphBase}/users/{Encode(credentials.MailboxAddress)}/messages/{Encode(messageId)}"
-                + $"/attachments/{Encode(attachmentId)}/$value";
-
-            using var valueRequest = new HttpRequestMessage(HttpMethod.Get, valueUrl);
-            using var valueResponse = await SendAsync(credentials, valueRequest, ct);
-            await EnsureSuccessAsync(valueResponse, "attachment download", ct);
-
-            var bytes = await valueResponse.Content.ReadAsByteArrayAsync(ct);
-            attachments.Add(new MailboxAttachment(name, bytes));
+            var size = item.TryGetProperty("size", out var sz) && sz.TryGetInt64(out var bytes) ? bytes : 0L;
+            attachments.Add(new MailboxAttachmentInfo(item.GetProperty("id").GetString()!, name, size));
         }
 
         return attachments;
+    }
+
+    public async Task<MailboxAttachment> DownloadAttachmentAsync(
+        MailboxCredentials credentials, string messageId, MailboxAttachmentInfo attachment, CancellationToken ct = default)
+    {
+        // $value streams the raw bytes and works above the ~3 MB inline contentBytes
+        // threshold, so it is used for every size.
+        var valueUrl = $"{GraphBase}/users/{Encode(credentials.MailboxAddress)}/messages/{Encode(messageId)}"
+            + $"/attachments/{Encode(attachment.Id)}/$value";
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, valueUrl);
+        using var response = await SendAsync(credentials, request, ct);
+        await EnsureSuccessAsync(response, "attachment download", ct);
+
+        var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+        _logger.LogInformation(
+            "Downloaded attachment {Name} ({Bytes} bytes) from message {MessageId}",
+            attachment.Name, bytes.Length, messageId);
+
+        return new MailboxAttachment(attachment.Name, bytes);
     }
 
     public async Task MarkAsReadAsync(MailboxCredentials credentials, string messageId, CancellationToken ct = default)
