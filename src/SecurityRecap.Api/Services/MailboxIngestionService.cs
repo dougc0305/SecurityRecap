@@ -137,10 +137,10 @@ public class MailboxIngestionService : IMailboxIngestionService
         {
             ct.ThrowIfCancellationRequested();
 
-            IReadOnlyList<MailboxAttachment> pdfs;
+            IReadOnlyList<MailboxAttachmentInfo> pdfs;
             try
             {
-                pdfs = await _mailbox.FetchPdfAttachmentsAsync(
+                pdfs = await _mailbox.ListPdfAttachmentsAsync(
                     credentials, message.Id, config.AttachmentNameContains, ct);
             }
             catch (MailboxException ex)
@@ -229,7 +229,7 @@ public class MailboxIngestionService : IMailboxIngestionService
     private async Task<MailboxMessageOutcome> IngestAttachmentAsync(
         MailboxIngestConfig config,
         MailboxMessage message,
-        MailboxAttachment pdf,
+        MailboxAttachmentInfo pdf,
         MailboxCredentials credentials,
         CancellationToken ct)
     {
@@ -237,9 +237,30 @@ public class MailboxIngestionService : IMailboxIngestionService
         // per attachment rather than per message.
         var externalId = $"graph:{message.InternetMessageId}:{pdf.Name}";
 
+        // The newest message stays inside the watermark window until a newer one arrives, so
+        // it is re-listed on every poll. Checking here — before the download — keeps that from
+        // re-transferring a multi-megabyte PDF every few minutes only for the ingestion layer
+        // to recognise it and throw the bytes away.
+        var alreadyIngestedId = await _db.Reports
+            .Where(r => r.PropertyId == config.PropertyId && r.ExternalId == externalId)
+            .Select(r => r.Id)
+            .FirstOrDefaultAsync(ct);
+
+        if (alreadyIngestedId != Guid.Empty)
+        {
+            _logger.LogDebug(
+                "Attachment {FileName} on {Subject} is already report {ReportId}; skipping download",
+                pdf.Name, message.Subject, alreadyIngestedId);
+
+            return new MailboxMessageOutcome(
+                message.Subject, message.FromAddress, message.ReceivedAtUtc,
+                pdf.Name, alreadyIngestedId, true, false, null);
+        }
+
         try
         {
-            await using var stream = new MemoryStream(pdf.Content);
+            var downloaded = await _mailbox.DownloadAttachmentAsync(credentials, message.Id, pdf, ct);
+            await using var stream = new MemoryStream(downloaded.Content);
 
             // The poller has no signed-in user. Admin role against the property's own tenant
             // gives it exactly the property it is configured for and nothing else.
@@ -285,6 +306,13 @@ public class MailboxIngestionService : IMailboxIngestionService
             return new MailboxMessageOutcome(
                 message.Subject, message.FromAddress, message.ReceivedAtUtc,
                 pdf.Name, result.ReportId, false, emailSent, emailError);
+        }
+        catch (MailboxException ex)
+        {
+            _logger.LogError(ex, "Downloading {FileName} from {Subject} failed", pdf.Name, message.Subject);
+            return new MailboxMessageOutcome(
+                message.Subject, message.FromAddress, message.ReceivedAtUtc,
+                pdf.Name, null, false, false, ex.Message);
         }
         catch (ClaudeApiException ex)
         {
