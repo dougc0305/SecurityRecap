@@ -96,10 +96,15 @@ export function UsersSection() {
     }
   };
 
-  const handleSaveProperties = async (u: ManagedUser, propertyIds: string[], summaryPropertyIds: string[]) => {
+  const handleSaveProperties = async (
+    u: ManagedUser,
+    propertyIds: string[],
+    summaryPropertyIds: string[],
+    alertPropertyIds: string[],
+  ) => {
     setActionError(null);
     try {
-      const res = await usersApi.setProperties(u.id, propertyIds, summaryPropertyIds);
+      const res = await usersApi.setProperties(u.id, propertyIds, summaryPropertyIds, alertPropertyIds);
       if (res.data.success) {
         setEditingProperties(null);
         await reload();
@@ -270,7 +275,8 @@ export function UsersSection() {
           user={editingProperties}
           allProperties={properties.map((p) => ({ id: p.id, name: p.name }))}
           onClose={() => setEditingProperties(null)}
-          onSave={(ids, summaryIds) => handleSaveProperties(editingProperties, ids, summaryIds)}
+          onSave={(ids, summaryIds, alertIds) =>
+            handleSaveProperties(editingProperties, ids, summaryIds, alertIds)}
         />
       )}
     </div>
@@ -317,10 +323,11 @@ function PropertyAssignmentModal({
   user: ManagedUser;
   allProperties: { id: string; name: string }[];
   onClose: () => void;
-  onSave: (ids: string[], summaryIds: string[]) => Promise<void> | void;
+  onSave: (ids: string[], summaryIds: string[], alertIds: string[]) => Promise<void> | void;
 }) {
   const [selected, setSelected] = useState<string[]>(user.propertyIds);
   const [summarySelected, setSummarySelected] = useState<string[]>(user.summaryPropertyIds);
+  const [alertSelected, setAlertSelected] = useState<string[]>(user.alertPropertyIds);
   const [saving, setSaving] = useState(false);
 
   const toggleAccess = (id: string) => {
@@ -330,6 +337,7 @@ function PropertyAssignmentModal({
       // open would be the wrong default anyway.
       setSelected(selected.filter((x) => x !== id));
       setSummarySelected(summarySelected.filter((x) => x !== id));
+      setAlertSelected(alertSelected.filter((x) => x !== id));
     } else {
       setSelected([...selected, id]);
     }
@@ -345,10 +353,19 @@ function PropertyAssignmentModal({
     }
   };
 
+  const toggleAlerts = (id: string) => {
+    if (alertSelected.includes(id)) {
+      setAlertSelected(alertSelected.filter((x) => x !== id));
+    } else {
+      setAlertSelected([...alertSelected, id]);
+      if (!selected.includes(id)) setSelected([...selected, id]);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onSave(selected, summarySelected);
+      await onSave(selected, summarySelected, alertSelected);
     } finally {
       setSaving(false);
     }
@@ -362,7 +379,7 @@ function PropertyAssignmentModal({
         <>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 70px 90px',
+            gridTemplateColumns: '1fr 62px 86px 86px',
             gap: '6px 8px',
             alignItems: 'center',
             fontSize: 13,
@@ -370,6 +387,7 @@ function PropertyAssignmentModal({
             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Property</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>Access</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>Summary email</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>Failure alerts</div>
             {allProperties.map((p) => (
               <Fragment key={p.id}>
                 <div>{p.name}</div>
@@ -389,12 +407,22 @@ function PropertyAssignmentModal({
                     onChange={() => toggleSummary(p.id)}
                   />
                 </div>
+                <div style={{ textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    aria-label={`Alert ${user.fullName} when pickup fails for ${p.name}`}
+                    checked={alertSelected.includes(p.id)}
+                    onChange={() => toggleAlerts(p.id)}
+                  />
+                </div>
               </Fragment>
             ))}
           </div>
           <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 12, lineHeight: 1.5 }}>
-            Recipients are worked out when each report is sent, so deactivating this user or
-            removing a property stops their email straight away.
+            <strong>Summary email</strong> is the nightly report. <strong>Failure alerts</strong>
+            tell you when pickup breaks or a report never arrives &mdash; usually just you, not
+            the board. Both are worked out when mail is sent, so deactivating this user or
+            removing a property stops it straight away.
             {!user.isActive && (
               <><br /><strong>This user is inactive, so they receive nothing right now.</strong></>
             )}

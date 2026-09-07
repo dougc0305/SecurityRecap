@@ -108,7 +108,7 @@ public class UserManagementService : IUserManagementService
         // Last write wins if the same property appears twice.
         var requested = assignments
             .GroupBy(a => a.PropertyId)
-            .ToDictionary(g => g.Key, g => g.Last().ReceivesSummary);
+            .ToDictionary(g => g.Key, g => g.Last());
 
         var validIds = await ValidatePropertyIdsAsync(tenantId, requested.Keys);
 
@@ -119,7 +119,8 @@ public class UserManagementService : IUserManagementService
             {
                 UserId = user.Id,
                 PropertyId = pid,
-                ReceivesSummary = requested[pid]
+                ReceivesSummary = requested[pid].ReceivesSummary,
+                ReceivesAlerts = requested[pid].ReceivesAlerts
             });
         }
         await _db.SaveChangesAsync();
@@ -178,7 +179,8 @@ public class UserManagementService : IUserManagementService
     private static UserSummary ToSummary(ApplicationUser u) => new(
         u.Id, u.Email!, u.FullName, u.Role, u.IsActive, u.MustChangePassword, u.CreatedAt,
         u.UserProperties.Select(up => up.PropertyId).ToList(),
-        u.UserProperties.Where(up => up.ReceivesSummary).Select(up => up.PropertyId).ToList());
+        u.UserProperties.Where(up => up.ReceivesSummary).Select(up => up.PropertyId).ToList(),
+        u.UserProperties.Where(up => up.ReceivesAlerts).Select(up => up.PropertyId).ToList());
 
     private static string GenerateTempPassword()
     {

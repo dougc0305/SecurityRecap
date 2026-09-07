@@ -11,7 +11,8 @@ public record UserDto(
     bool MustChangePassword,
     DateTime CreatedAt,
     IReadOnlyList<Guid> PropertyIds,
-    IReadOnlyList<Guid> SummaryPropertyIds);
+    IReadOnlyList<Guid> SummaryPropertyIds,
+    IReadOnlyList<Guid> AlertPropertyIds);
 
 public record CreateUserRequest(
     [Required, EmailAddress] string Email,
@@ -33,7 +34,8 @@ public record SetActiveRequest(bool IsActive);
 /// </summary>
 public record AssignPropertiesRequest(
     IReadOnlyList<Guid> PropertyIds,
-    IReadOnlyList<Guid>? SummaryPropertyIds);
+    IReadOnlyList<Guid>? SummaryPropertyIds,
+    IReadOnlyList<Guid>? AlertPropertyIds);
 
 public record ResetPasswordResponse(string TempPassword);
 

@@ -93,7 +93,7 @@ is_active, created_at
 
 ### user_properties
 user_id (FK), property_id (FK), receives_summary (bool, default false),
-PRIMARY KEY (user_id, property_id)
+receives_alerts (bool, default false), PRIMARY KEY (user_id, property_id)
 
 ## API Conventions
 - RESTful endpoints under /api/v1/
@@ -187,6 +187,11 @@ the Entra app registration, per-property setup, and deployment prerequisites.
 - MailboxPollingBackgroundService ticks on MailboxIngest:TickIntervalSeconds and polls each
   property whose own poll_interval_minutes has elapsed; failures back off exponentially.
 - Idempotency: report external_id is `graph:{internetMessageId}:{fileName}`.
+- Failure alerts (MailboxAlertNotifier) email users flagged with receives_alerts when a poll
+  fails, a report cannot be processed, or no report has arrived within stale_after_hours.
+  Repeats of the same problem are throttled to 12h; a recovery notice is sent when it clears.
+  NOTE: this is in-process, so it cannot report that the app itself is down — that is what the
+  IIS app pool settings below guard against.
 - Summary recipients are resolved at send time, never stored as a list: active users with
   user_properties.receives_summary for that property, plus mailbox_ingest_configs
   .summary_recipients for people with no account. Deactivating a user or removing their
@@ -195,6 +200,13 @@ the Entra app registration, per-property setup, and deployment prerequisites.
   tenant_id, Guid.Empty user id, and UserRole.Admin.
 - Integration secrets use ISecretProtector (ASP.NET Data Protection), NOT the one-way hashing
   used for passwords and API keys, because they must be replayed to Graph.
+
+## IIS requirements for background polling
+MailboxPollingBackgroundService only runs while the app pool is alive, so the SecurityRecap
+app pool MUST be configured to stay up. Defaults will silently stop all polling:
+- processModel.idleTimeout = 00:00:00 (default 20 min terminates the worker, killing the poller)
+- startMode = AlwaysRunning, and preloadEnabled = true on the app
+- recycling.periodicRestart.time = 0 with a fixed schedule (03:00) instead of the drifting 29h default
 
 ## Environment Variables (.env / appsettings)
 - ConnectionStrings__DefaultConnection  (PostgreSQL)

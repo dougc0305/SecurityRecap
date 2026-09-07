@@ -98,6 +98,7 @@ public class MailboxIngestController : BaseApiController
         config.AttachmentNameContains = Blank(request.AttachmentNameContains);
         config.LookbackDays = request.LookbackDays;
         config.PollIntervalMinutes = request.PollIntervalMinutes;
+        config.StaleAfterHours = request.StaleAfterHours;
         config.MarkAsRead = request.MarkAsRead;
         config.MoveToFolder = Blank(request.MoveToFolder);
         config.SendSummaryEmail = request.SendSummaryEmail;
@@ -212,6 +213,7 @@ public class MailboxIngestController : BaseApiController
         c.AttachmentNameContains,
         c.LookbackDays,
         c.PollIntervalMinutes,
+        c.StaleAfterHours,
         c.MarkAsRead,
         c.MoveToFolder,
         c.SendSummaryEmail,
@@ -222,7 +224,9 @@ public class MailboxIngestController : BaseApiController
         c.LastSuccessAt,
         c.LastMessageReceivedAt,
         c.LastError,
-        c.ConsecutiveFailures);
+        c.ConsecutiveFailures,
+        c.LastReportIngestedAt,
+        c.LastAlertAt);
 
     private static MailboxPollResultDto ToDto(MailboxPollResult r) => new(
         r.PropertyId,

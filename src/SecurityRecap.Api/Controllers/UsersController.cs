@@ -99,17 +99,18 @@ public class UsersController : BaseApiController
         {
             var propertyIds = request.PropertyIds ?? Array.Empty<Guid>();
             var summaryIds = request.SummaryPropertyIds ?? Array.Empty<Guid>();
+            var alertIds = request.AlertPropertyIds ?? Array.Empty<Guid>();
 
             // Refuse to mail someone about a property they cannot open. Without this the
-            // summary flag would quietly become a second, invisible access path.
-            var orphaned = summaryIds.Except(propertyIds).ToList();
+            // summary and alert flags would quietly become a second, invisible access path.
+            var orphaned = summaryIds.Concat(alertIds).Except(propertyIds).ToList();
             if (orphaned.Count > 0)
                 return BadRequest(ApiResponse<UserDto>.Fail(
-                    "A user can only receive summaries for properties they are assigned to."));
+                    "A user can only receive summaries or alerts for properties they are assigned to."));
 
             var assignments = propertyIds
                 .Distinct()
-                .Select(pid => new PropertyAssignment(pid, summaryIds.Contains(pid)))
+                .Select(pid => new PropertyAssignment(pid, summaryIds.Contains(pid), alertIds.Contains(pid)))
                 .ToList();
 
             var summary = await _users.ReplacePropertiesAsync(tenantId, id, assignments);
@@ -146,5 +147,5 @@ public class UsersController : BaseApiController
 
     private static UserDto ToDto(UserSummary s) => new(
         s.Id, s.Email, s.FullName, s.Role.ToString(), s.IsActive, s.MustChangePassword, s.CreatedAt,
-        s.PropertyIds, s.SummaryPropertyIds);
+        s.PropertyIds, s.SummaryPropertyIds, s.AlertPropertyIds);
 }

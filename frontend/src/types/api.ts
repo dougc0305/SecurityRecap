@@ -44,6 +44,8 @@ export interface ManagedUser {
   propertyIds: string[];
   /** Subset of propertyIds whose nightly summary this user is emailed. */
   summaryPropertyIds: string[];
+  /** Subset of propertyIds whose pickup failures this user is emailed about. */
+  alertPropertyIds: string[];
 }
 
 export interface CreateUserRequest {
@@ -129,6 +131,7 @@ export interface MailboxIngestConfig {
   attachmentNameContains: string | null;
   lookbackDays: number;
   pollIntervalMinutes: number;
+  staleAfterHours: number;
   markAsRead: boolean;
   moveToFolder: string | null;
   sendSummaryEmail: boolean;
@@ -140,6 +143,8 @@ export interface MailboxIngestConfig {
   lastMessageReceivedAt: string | null;
   lastError: string | null;
   consecutiveFailures: number;
+  lastReportIngestedAt: string | null;
+  lastAlertAt: string | null;
 }
 
 export interface SaveMailboxIngestConfigRequest {
@@ -155,6 +160,7 @@ export interface SaveMailboxIngestConfigRequest {
   attachmentNameContains: string | null;
   lookbackDays: number;
   pollIntervalMinutes: number;
+  staleAfterHours: number;
   markAsRead: boolean;
   moveToFolder: string | null;
   sendSummaryEmail: boolean;
