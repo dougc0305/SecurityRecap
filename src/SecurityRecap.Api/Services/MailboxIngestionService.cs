@@ -54,13 +54,85 @@ public class MailboxIngestionService : IMailboxIngestionService
 
         var candidates = await _db.MailboxIngestConfigs
             .Where(c => c.IsEnabled && c.Property.IsActive)
-            .Select(c => new { c.PropertyId, c.LastPolledAt, c.PollIntervalMinutes, c.ConsecutiveFailures })
+            .Select(c => new
+            {
+                c.PropertyId,
+                c.LastPolledAt,
+                c.PollIntervalMinutes,
+                c.ActiveWindowStart,
+                c.ActiveWindowEnd,
+                c.ActiveWindowPollMinutes,
+                c.ScheduleTimeZone,
+                PropertyTimeZone = c.Property.Timezone,
+                c.ConsecutiveFailures
+            })
             .ToListAsync(ct);
 
-        return candidates
-            .Where(c => c.LastPolledAt is null || now >= c.LastPolledAt.Value.AddMinutes(NextDelay(c.PollIntervalMinutes, c.ConsecutiveFailures)))
-            .Select(c => c.PropertyId)
-            .ToList();
+        var due = new List<Guid>();
+        foreach (var c in candidates)
+        {
+            var interval = EffectiveIntervalMinutes(
+                now, c.ActiveWindowStart, c.ActiveWindowEnd, c.ActiveWindowPollMinutes,
+                c.PollIntervalMinutes, c.ScheduleTimeZone ?? c.PropertyTimeZone);
+
+            if (c.LastPolledAt is null
+                || now >= c.LastPolledAt.Value.AddMinutes(NextDelay(interval, c.ConsecutiveFailures)))
+            {
+                due.Add(c.PropertyId);
+            }
+        }
+
+        return due;
+    }
+
+    /// <summary>
+    /// The report lands in a narrow daily window, so poll tightly around it and sparsely the
+    /// rest of the day rather than paying the same rate around the clock.
+    /// </summary>
+    internal int EffectiveIntervalMinutes(
+        DateTime nowUtc,
+        TimeOnly? windowStart,
+        TimeOnly? windowEnd,
+        int windowIntervalMinutes,
+        int offPeakIntervalMinutes,
+        string? timeZoneId)
+    {
+        if (windowStart is null || windowEnd is null)
+            return offPeakIntervalMinutes;
+
+        var local = ToLocalTime(nowUtc, timeZoneId);
+        if (local is null)
+            return Math.Min(windowIntervalMinutes, offPeakIntervalMinutes);
+
+        return IsInWindow(TimeOnly.FromDateTime(local.Value), windowStart.Value, windowEnd.Value)
+            ? windowIntervalMinutes
+            : offPeakIntervalMinutes;
+    }
+
+    /// <summary>Handles a window that wraps past midnight, e.g. 22:00 to 02:00.</summary>
+    internal static bool IsInWindow(TimeOnly now, TimeOnly start, TimeOnly end) =>
+        start <= end
+            ? now >= start && now <= end
+            : now >= start || now <= end;
+
+    private DateTime? ToLocalTime(DateTime utc, string? timeZoneId)
+    {
+        if (string.IsNullOrWhiteSpace(timeZoneId)) return null;
+
+        try
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), tz);
+        }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            // A bad timezone must not silently disable the tight window and delay the report;
+            // fall back to the faster cadence and make the misconfiguration visible.
+            _logger.LogWarning(ex,
+                "Timezone '{TimeZoneId}' could not be resolved; polling at the active-window rate all day",
+                timeZoneId);
+            return null;
+        }
     }
 
     /// <summary>

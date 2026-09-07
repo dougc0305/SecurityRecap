@@ -22,7 +22,11 @@ const EMPTY_FORM: FormState = {
   subjectContains: '',
   attachmentNameContains: '',
   lookbackDays: 3,
-  pollIntervalMinutes: 15,
+  pollIntervalMinutes: 60,
+  activeWindowStart: '08:30',
+  activeWindowEnd: '10:00',
+  activeWindowPollMinutes: 5,
+  scheduleTimeZone: 'America/New_York',
   staleAfterHours: 26,
   markAsRead: true,
   moveToFolder: '',
@@ -92,6 +96,10 @@ export function MailboxIngestSection() {
       attachmentNameContains: loaded.attachmentNameContains ?? '',
       lookbackDays: loaded.lookbackDays,
       pollIntervalMinutes: loaded.pollIntervalMinutes,
+      activeWindowStart: loaded.activeWindowStart?.slice(0, 5) ?? '',
+      activeWindowEnd: loaded.activeWindowEnd?.slice(0, 5) ?? '',
+      activeWindowPollMinutes: loaded.activeWindowPollMinutes,
+      scheduleTimeZone: loaded.scheduleTimeZone ?? '',
       staleAfterHours: loaded.staleAfterHours,
       markAsRead: loaded.markAsRead,
       moveToFolder: loaded.moveToFolder ?? '',
@@ -138,6 +146,10 @@ export function MailboxIngestSection() {
         attachmentNameContains: form.attachmentNameContains?.trim() || null,
         lookbackDays: form.lookbackDays,
         pollIntervalMinutes: form.pollIntervalMinutes,
+        activeWindowStart: form.activeWindowStart || null,
+        activeWindowEnd: form.activeWindowEnd || null,
+        activeWindowPollMinutes: form.activeWindowPollMinutes,
+        scheduleTimeZone: form.scheduleTimeZone?.trim() || null,
         staleAfterHours: form.staleAfterHours,
         markAsRead: form.markAsRead,
         moveToFolder: form.moveToFolder?.trim() || null,
@@ -405,7 +417,7 @@ export function MailboxIngestSection() {
               />
             </div>
             <div>
-              <label style={labelStyle}>Check every (minutes)</label>
+              <label style={labelStyle}>Check every (minutes, outside the window)</label>
               <input
                 className="input"
                 type="number"
@@ -470,6 +482,55 @@ export function MailboxIngestSection() {
               />
               Check automatically on a schedule
             </label>
+          </div>
+
+          <h3 style={{ fontSize: 13, margin: '24px 0 12px', color: 'var(--text-muted)' }}>
+            When the report is expected
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1.4fr', gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Window starts</label>
+              <input
+                className="input"
+                type="time"
+                value={form.activeWindowStart ?? ''}
+                onChange={(e) => setForm({ ...form, activeWindowStart: e.target.value })}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Window ends</label>
+              <input
+                className="input"
+                type="time"
+                value={form.activeWindowEnd ?? ''}
+                onChange={(e) => setForm({ ...form, activeWindowEnd: e.target.value })}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Check every (minutes, in window)</label>
+              <input
+                className="input"
+                type="number"
+                min={1}
+                max={1440}
+                value={form.activeWindowPollMinutes}
+                onChange={(e) => setForm({ ...form, activeWindowPollMinutes: Number(e.target.value) })}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Window timezone</label>
+              <input
+                className="input"
+                placeholder="America/New_York"
+                value={form.scheduleTimeZone ?? ''}
+                onChange={(e) => setForm({ ...form, scheduleTimeZone: e.target.value })}
+              />
+              <div style={hintStyle}>
+                IANA id. Blank uses the property's own timezone &mdash; which is not necessarily
+                where the sender's schedule is anchored. Leave both times empty to poll at one
+                rate all day.
+              </div>
+            </div>
           </div>
 
           <h3 style={{ fontSize: 13, margin: '24px 0 12px', color: 'var(--text-muted)' }}>

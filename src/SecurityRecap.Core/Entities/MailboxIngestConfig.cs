@@ -38,7 +38,28 @@ public class MailboxIngestConfig
     public int LookbackDays { get; set; } = 3;
 
     // --- Behaviour ---
+    /// <summary>How often to check outside the active window (or always, if none is set).</summary>
     public int PollIntervalMinutes { get; set; } = 15;
+
+    /// <summary>
+    /// Start of the daily window when the report is expected, in ScheduleTimeZone. Null
+    /// disables windowing and PollIntervalMinutes applies around the clock.
+    /// </summary>
+    public TimeOnly? ActiveWindowStart { get; set; }
+
+    /// <summary>End of the expected-report window. A window may span midnight.</summary>
+    public TimeOnly? ActiveWindowEnd { get; set; }
+
+    /// <summary>How often to check inside the active window.</summary>
+    public int ActiveWindowPollMinutes { get; set; } = 5;
+
+    /// <summary>
+    /// IANA timezone the window is expressed in, e.g. America/New_York. Held separately from
+    /// the property's timezone on purpose: the property is where the patrol happens, which is
+    /// not necessarily where the sender's schedule is anchored. Falls back to the property's
+    /// timezone when unset.
+    /// </summary>
+    public string? ScheduleTimeZone { get; set; }
     public bool MarkAsRead { get; set; } = true;
 
     /// <summary>Folder to move processed messages into. Null leaves them in place.</summary>

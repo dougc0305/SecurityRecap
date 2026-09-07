@@ -161,6 +161,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             // Matches the entity default so an existing config row picks up the staleness
             // check on migration rather than silently getting 0, which disables it.
             e.Property(m => m.StaleAfterHours).HasDefaultValue(26);
+            // Same reasoning: without an explicit default an existing row would get 0, which
+            // Math.Max clamps to a one-minute poll — the opposite of the intent.
+            e.Property(m => m.ActiveWindowPollMinutes).HasDefaultValue(5);
         });
 
         // ServiceAssignment (cross-tenant property visibility for management/security companies)
