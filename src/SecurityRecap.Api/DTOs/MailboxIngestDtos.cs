@@ -15,6 +15,7 @@ public record MailboxIngestConfigDto(
     string? AttachmentNameContains,
     int LookbackDays,
     int PollIntervalMinutes,
+    int StaleAfterHours,
     bool MarkAsRead,
     string? MoveToFolder,
     bool SendSummaryEmail,
@@ -25,7 +26,9 @@ public record MailboxIngestConfigDto(
     DateTime? LastSuccessAt,
     DateTime? LastMessageReceivedAt,
     string? LastError,
-    int ConsecutiveFailures);
+    int ConsecutiveFailures,
+    DateTime? LastReportIngestedAt,
+    DateTime? LastAlertAt);
 
 public class SaveMailboxIngestConfigRequest
 {
@@ -62,6 +65,10 @@ public class SaveMailboxIngestConfigRequest
 
     [Range(1, 1440, ErrorMessage = "Poll interval must be between 1 minute and 24 hours")]
     public int PollIntervalMinutes { get; set; } = 15;
+
+    /// <summary>Alert when no report has arrived for this many hours. Zero disables the check.</summary>
+    [Range(0, 720, ErrorMessage = "Stale threshold must be between 0 and 720 hours")]
+    public int StaleAfterHours { get; set; } = 26;
 
     public bool MarkAsRead { get; set; } = true;
     public string? MoveToFolder { get; set; }

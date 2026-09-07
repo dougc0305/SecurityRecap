@@ -23,6 +23,7 @@ const EMPTY_FORM: FormState = {
   attachmentNameContains: '',
   lookbackDays: 3,
   pollIntervalMinutes: 15,
+  staleAfterHours: 26,
   markAsRead: true,
   moveToFolder: '',
   sendSummaryEmail: false,
@@ -91,6 +92,7 @@ export function MailboxIngestSection() {
       attachmentNameContains: loaded.attachmentNameContains ?? '',
       lookbackDays: loaded.lookbackDays,
       pollIntervalMinutes: loaded.pollIntervalMinutes,
+      staleAfterHours: loaded.staleAfterHours,
       markAsRead: loaded.markAsRead,
       moveToFolder: loaded.moveToFolder ?? '',
       sendSummaryEmail: loaded.sendSummaryEmail,
@@ -136,6 +138,7 @@ export function MailboxIngestSection() {
         attachmentNameContains: form.attachmentNameContains?.trim() || null,
         lookbackDays: form.lookbackDays,
         pollIntervalMinutes: form.pollIntervalMinutes,
+        staleAfterHours: form.staleAfterHours,
         markAsRead: form.markAsRead,
         moveToFolder: form.moveToFolder?.trim() || null,
         sendSummaryEmail: form.sendSummaryEmail,
@@ -300,6 +303,10 @@ export function MailboxIngestSection() {
                 <div style={labelStyle}>Newest report seen</div>
                 {formatTimestamp(config.lastMessageReceivedAt)}
               </div>
+              <div>
+                <div style={labelStyle}>Last report ingested</div>
+                {formatTimestamp(config.lastReportIngestedAt)}
+              </div>
               {config.lastError && (
                 <div style={{ gridColumn: '1 / -1' }}>
                   <div style={labelStyle}>
@@ -419,6 +426,20 @@ export function MailboxIngestSection() {
                 onChange={(e) => setForm({ ...form, lookbackDays: Number(e.target.value) })}
               />
               <div style={hintStyle}>How far back to reach on the very first check.</div>
+            </div>
+            <div>
+              <label style={labelStyle}>Alert if no report for (hours)</label>
+              <input
+                className="input"
+                type="number"
+                min={0}
+                max={720}
+                value={form.staleAfterHours}
+                onChange={(e) => setForm({ ...form, staleAfterHours: Number(e.target.value) })}
+              />
+              <div style={hintStyle}>
+                Emails anyone flagged for failure alerts if a report goes missing. 0 turns it off.
+              </div>
             </div>
             <div>
               <label style={labelStyle}>Move processed mail to</label>

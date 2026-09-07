@@ -55,11 +55,31 @@ public class MailboxIngestConfig
     public bool IsEnabled { get; set; } = true;
 
     // --- Observability ---
+    /// <summary>
+    /// Alert when no report has been ingested for this many hours. The nightly report should
+    /// arrive daily, so a gap means either the sender stopped or pickup is broken silently.
+    /// Zero disables the check.
+    /// </summary>
+    public int StaleAfterHours { get; set; } = 26;
+
     public DateTime? LastPolledAt { get; set; }
     public DateTime? LastSuccessAt { get; set; }
     public DateTime? LastMessageReceivedAt { get; set; }
     public string? LastError { get; set; }
     public int ConsecutiveFailures { get; set; }
+
+    /// <summary>When a report was last successfully ingested. Drives the staleness check.</summary>
+    public DateTime? LastReportIngestedAt { get; set; }
+
+    /// <summary>When the last alert email went out, used to throttle repeats.</summary>
+    public DateTime? LastAlertAt { get; set; }
+
+    /// <summary>
+    /// Identifies what the last alert was about. An unchanged signature is not re-sent until
+    /// the throttle window lapses, so a failure repeating every poll does not flood the inbox.
+    /// Null means the property is not currently in an alerted state.
+    /// </summary>
+    public string? LastAlertSignature { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

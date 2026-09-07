@@ -12,6 +12,13 @@ public class UserProperty
     /// </summary>
     public bool ReceivesSummary { get; set; }
 
+    /// <summary>
+    /// Whether this user should be emailed when report pickup fails, or when a report that
+    /// was expected has not arrived. Separate from the summary flag: board members want the
+    /// nightly report, but usually only an operator wants to hear that the plumbing broke.
+    /// </summary>
+    public bool ReceivesAlerts { get; set; }
+
     public ApplicationUser User { get; set; } = null!;
     public Property Property { get; set; } = null!;
 }

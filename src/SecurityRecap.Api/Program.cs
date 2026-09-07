@@ -125,6 +125,7 @@ builder.Services.AddHttpClient<IMailboxClient, GraphMailboxClient>(client =>
     // Report PDFs run to a few MB and Graph can be slow to hand them over.
     client.Timeout = TimeSpan.FromMinutes(2);
 });
+builder.Services.AddScoped<MailboxAlertNotifier>();
 builder.Services.AddScoped<IMailboxIngestionService, MailboxIngestionService>();
 builder.Services.AddHostedService<MailboxPollingBackgroundService>();
 builder.Services.AddScoped<IReportService, ReportService>();

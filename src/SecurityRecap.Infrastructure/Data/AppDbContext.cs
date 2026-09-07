@@ -158,6 +158,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             e.HasOne(m => m.Property).WithOne().HasForeignKey<MailboxIngestConfig>(m => m.PropertyId);
             e.HasIndex(m => m.PropertyId).IsUnique();
             e.Property(m => m.CreatedAt).HasDefaultValueSql("now()");
+            // Matches the entity default so an existing config row picks up the staleness
+            // check on migration rather than silently getting 0, which disables it.
+            e.Property(m => m.StaleAfterHours).HasDefaultValue(26);
         });
 
         // ServiceAssignment (cross-tenant property visibility for management/security companies)

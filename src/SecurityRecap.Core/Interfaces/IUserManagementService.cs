@@ -4,7 +4,7 @@ using SecurityRecap.Core.Entities;
 using SecurityRecap.Core.Enums;
 
 /// <summary>A property a user is assigned to, and whether they are mailed its summary.</summary>
-public record PropertyAssignment(Guid PropertyId, bool ReceivesSummary);
+public record PropertyAssignment(Guid PropertyId, bool ReceivesSummary, bool ReceivesAlerts);
 
 public record UserSummary(
     Guid Id,
@@ -15,7 +15,8 @@ public record UserSummary(
     bool MustChangePassword,
     DateTime CreatedAt,
     IReadOnlyList<Guid> PropertyIds,
-    IReadOnlyList<Guid> SummaryPropertyIds);
+    IReadOnlyList<Guid> SummaryPropertyIds,
+    IReadOnlyList<Guid> AlertPropertyIds);
 
 public record CreateUserResult(UserSummary User, string TempPassword);
 

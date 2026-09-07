@@ -29,6 +29,7 @@ public class MailboxIngestionService : IMailboxIngestionService
     private readonly IMailboxClient _mailbox;
     private readonly IIngestionService _ingestion;
     private readonly ISecretProtector _secrets;
+    private readonly MailboxAlertNotifier _alerts;
     private readonly ILogger<MailboxIngestionService> _logger;
 
     public MailboxIngestionService(
@@ -36,12 +37,14 @@ public class MailboxIngestionService : IMailboxIngestionService
         IMailboxClient mailbox,
         IIngestionService ingestion,
         ISecretProtector secrets,
+        MailboxAlertNotifier alerts,
         ILogger<MailboxIngestionService> logger)
     {
         _db = db;
         _mailbox = mailbox;
         _ingestion = ingestion;
         _secrets = secrets;
+        _alerts = alerts;
         _logger = logger;
     }
 
@@ -99,7 +102,7 @@ public class MailboxIngestionService : IMailboxIngestionService
         }
         catch (Exception ex) when (ex is CryptographicException or MailboxException)
         {
-            return await FailAsync(config, propertyName, DescribeCredentialFailure(ex), outcomes, ct);
+            return await FailAsync(config, propertyName, DescribeCredentialFailure(ex), outcomes, null, ct);
         }
 
         var query = new MailboxQuery(
@@ -115,7 +118,7 @@ public class MailboxIngestionService : IMailboxIngestionService
         }
         catch (MailboxException ex)
         {
-            return await FailAsync(config, propertyName, ex.Message, outcomes, ct);
+            return await FailAsync(config, propertyName, ex.Message, outcomes, credentials, ct);
         }
 
         var ingestedCount = 0;
@@ -205,6 +208,12 @@ public class MailboxIngestionService : IMailboxIngestionService
         // The mailbox itself was reachable, so the connection-level backoff resets even if
         // individual reports failed to process.
         config.ConsecutiveFailures = 0;
+
+        if (ingestedCount > 0)
+            config.LastReportIngestedAt = DateTime.UtcNow;
+
+        await RaiseOrClearAlertsAsync(config, credentials, realErrors, ct);
+
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation(
@@ -331,6 +340,56 @@ public class MailboxIngestionService : IMailboxIngestionService
         _logger.LogInformation(
             "Sent summary for report {ReportId} to {RecipientCount} recipient(s)",
             result.ReportId, recipients.Count);
+    }
+
+    /// <summary>
+    /// Decides, after a poll that reached the mailbox, whether to raise an alert, leave an
+    /// existing one standing, or announce recovery. Kept separate from the poll loop so the
+    /// ordering of the three cases is obvious.
+    /// </summary>
+    private async Task RaiseOrClearAlertsAsync(
+        MailboxIngestConfig config,
+        MailboxCredentials credentials,
+        IReadOnlyList<string> realErrors,
+        CancellationToken ct)
+    {
+        if (realErrors.Count > 0)
+        {
+            await _alerts.RaiseAsync(
+                config, credentials, MailboxAlertKind.ReportFailed,
+                string.Join("; ", realErrors.Take(3)), ct);
+            return;
+        }
+
+        // Nothing failed — but a report that never arrives produces no error at all, which is
+        // the failure mode most likely to go unnoticed. Treat an overdue report as a problem.
+        var staleness = DescribeStaleness(config);
+        if (staleness is not null)
+        {
+            await _alerts.RaiseAsync(config, credentials, MailboxAlertKind.NoReportReceived, staleness, ct);
+            return;
+        }
+
+        await _alerts.ClearAsync(config, credentials, ct);
+    }
+
+    /// <summary>
+    /// Returns a description of how overdue the next report is, or null when nothing is due.
+    /// A config that has never ingested anything is measured from when it was created, so a
+    /// brand new setup does not immediately alert.
+    /// </summary>
+    private static string? DescribeStaleness(MailboxIngestConfig config)
+    {
+        if (config.StaleAfterHours <= 0) return null;
+
+        var since = config.LastReportIngestedAt ?? config.CreatedAt;
+        var elapsed = DateTime.UtcNow - since;
+        if (elapsed.TotalHours < config.StaleAfterHours) return null;
+
+        var hours = (int)elapsed.TotalHours;
+        return config.LastReportIngestedAt is null
+            ? $"No report has been ingested since this mailbox was configured {hours} hours ago."
+            : $"The last report was ingested {hours} hours ago, which is beyond the {config.StaleAfterHours} hour window.";
     }
 
     /// <summary>
@@ -468,10 +527,18 @@ public class MailboxIngestionService : IMailboxIngestionService
         string propertyName,
         string error,
         IReadOnlyList<MailboxMessageOutcome> outcomes,
+        MailboxCredentials? credentials,
         CancellationToken ct)
     {
         config.LastError = error;
         config.ConsecutiveFailures++;
+
+        // Alerting needs the same Graph credentials that just failed. When the credentials
+        // themselves are the problem there is nothing to send with, so the failure is only
+        // logged — the staleness check will catch it once a report goes missing.
+        if (credentials is not null)
+            await _alerts.RaiseAsync(config, credentials, MailboxAlertKind.PollFailed, error, ct);
+
         await _db.SaveChangesAsync(ct);
 
         _logger.LogError("Mailbox poll for {PropertyName} failed (attempt {Attempt}): {Error}",
