@@ -146,14 +146,17 @@ Located at: src/SecurityRecap.Api/Prompts/IngestionPrompt.cs
 The ingestion prompt receives:
 - The PDF as base64
 - The property's history as JSON, built by ReportHistoryContextBuilder: 90 days of incidents,
-  counts by type over 7/30/90 days, repeat addresses, repeat vehicles, average incidents per
-  report, and days since the last high/urgent incident
+  counts by type over 7/30/90 days, repeat addresses, every known licence plate with its prior
+  violation count and first-seen date, average incidents per report, and days since the last
+  high/urgent incident
 
 It returns a JSON object with:
 - incidents[]
 - vehicles[]
 - maintenance_issues[]
 - pattern_matches[]      (with first_observed, occurrence_count, significance)
+- vehicles[]             (with seen_before, prior_violation_count, first_seen — informational;
+                          the vehicles table remains authoritative for counts)
 - anomalies[]            (expected-but-absent activity, values outside the norm)
 - data_quality_notes[]   (internal contradictions in the source PDF)
 - urgent_items[]
@@ -178,6 +181,12 @@ The chat prompt receives:
 - /reports            ← archive with PDF download and AI summary view
 - /chat               ← AI chat interface
 - /settings           ← property and user management
+
+## Licence plates
+Use SecurityRecap.Core.PlateNumber for anything plate-related. Reports use UNKNOWN / N/A / NONE
+to mean "tag not readable"; recorded as vehicles these collect into one fictitious row that
+looks like a serial offender and poisons repeat-plate history. IngestionService records such a
+violation with VehicleId null instead, and the history context excludes them.
 
 ## Automated Report Pickup
 Patrol report emails are picked up from a mailbox via Microsoft Graph (app-only) and pushed

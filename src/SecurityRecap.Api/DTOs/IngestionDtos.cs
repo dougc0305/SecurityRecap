@@ -99,6 +99,19 @@ public class IngestionVehicle
 
     [JsonPropertyName("location")]
     public string? Location { get; set; }
+
+    /// <summary>
+    /// The model's read of whether this plate was already on file. Informational only —
+    /// the authoritative counts come from the vehicles table, which is updated during ingest.
+    /// </summary>
+    [JsonPropertyName("seen_before")]
+    public bool? SeenBefore { get; set; }
+
+    [JsonPropertyName("prior_violation_count")]
+    public int? PriorViolationCount { get; set; }
+
+    [JsonPropertyName("first_seen")]
+    public string? FirstSeen { get; set; }
 }
 
 public class IngestionMaintenanceIssue

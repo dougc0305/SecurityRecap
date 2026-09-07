@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SecurityRecap.Core;
 using SecurityRecap.Infrastructure.Data;
 
 namespace SecurityRecap.Api.Services;
@@ -28,13 +29,13 @@ public class ReportHistoryContextBuilder
 
     public record RepeatAddress(string Address, int IncidentCount, DateTime? LastIncident, int Last30Days);
 
-    public record RepeatVehicle(
+    public record KnownVehicle(
         string PlateNumber,
         string? PlateState,
         string? Make,
         string? Model,
         string? Color,
-        int ViolationCount,
+        int PriorViolationCount,
         DateTime? FirstSeen,
         DateTime? LastSeen);
 
@@ -50,7 +51,7 @@ public class ReportHistoryContextBuilder
         string? LastHighOrUrgentDescription,
         IReadOnlyList<TypeCount> IncidentCountsByType,
         IReadOnlyList<RepeatAddress> RepeatAddresses,
-        IReadOnlyList<RepeatVehicle> RepeatVehicles,
+        IReadOnlyList<KnownVehicle> KnownVehicles,
         IReadOnlyList<IncidentSnapshot> RecentIncidents);
 
     public async Task<PropertyHistoryContext> BuildAsync(Guid propertyId, CancellationToken ct = default)
@@ -138,14 +139,27 @@ public class ReportHistoryContextBuilder
                     && Effective(i.IncidentTime, i.CreatedAt) >= since30)))
             .ToList();
 
-        var repeatVehicles = await _db.Vehicles
-            .Where(v => v.PropertyId == propertyId && v.ViolationCount > 1)
-            .OrderByDescending(v => v.ViolationCount)
-            .Take(15)
-            .Select(v => new RepeatVehicle(
+        // Every plate already on file, not just repeat offenders. A plate seen once before is
+        // exactly the case worth flagging on its second appearance, and the old "more than one
+        // violation" filter made that invisible. Ordered by most recently seen so the cap drops
+        // the coldest history first.
+        var knownVehicleRows = await _db.Vehicles
+            .Where(v => v.PropertyId == propertyId)
+            .OrderByDescending(v => v.LastSeen)
+            .Select(v => new
+            {
+                v.PlateNumber, v.PlateState, v.Make, v.Model, v.Color,
+                v.ViolationCount, v.FirstSeen, v.LastSeen
+            })
+            .ToListAsync(ct);
+
+        var knownVehicles = knownVehicleRows
+            .Where(v => PlateNumber.IsTrackable(v.PlateNumber))
+            .Take(250)
+            .Select(v => new KnownVehicle(
                 v.PlateNumber, v.PlateState, v.Make, v.Model, v.Color,
                 v.ViolationCount, v.FirstSeen, v.LastSeen))
-            .ToListAsync(ct);
+            .ToList();
 
         var recent = incidents90
             .OrderByDescending(i => Effective(i.IncidentTime, i.CreatedAt))
@@ -165,7 +179,7 @@ public class ReportHistoryContextBuilder
             lastSerious?.Description,
             countsByType,
             repeatAddressList,
-            repeatVehicles,
+            knownVehicles,
             recent);
     }
 }
