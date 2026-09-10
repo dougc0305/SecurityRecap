@@ -11,7 +11,11 @@ public static class IngestionPrompt
 
         Here is the property's history for context. It covers the last 90 days of incidents,
         aggregate counts, repeat addresses, and every licence plate already on file with the
-        number of violations previously recorded against it:
+        number of violations previously recorded against it.
+
+        Every timestamp in this history is already in the property's local time, the same clock
+        the PDF prints, and the time_zone field names it. Compare times directly; do not apply
+        any offset. Field names ending in _local say so explicitly.
         {{propertyHistoryJson}}
 
         Use that history actively. A reader who gets this summary every day already knows what a
@@ -23,6 +27,11 @@ public static class IngestionPrompt
         - Flag anything that breaks the established pattern, including absences: a routine check
           that normally happens and did not, a patrol count well below the recent average, a gate
           or restroom that is normally secured at a certain hour and was not.
+        - Before calling a time unusual, check the history for the same routine on other days and
+          quote what you found. A shift of several hours in a daily routine is far more likely to
+          be a data problem than a real change in operations, so if the history for that routine
+          is sparse, inconsistent, or looks implausible for the activity, say the baseline is
+          unreliable rather than reporting an anomaly.
         - Do not manufacture patterns. If the history is thin or the shift was genuinely routine,
           say so plainly rather than padding.
         - Report internal inconsistencies in the source document, such as a log entry whose

@@ -239,7 +239,11 @@ app pool MUST be configured to stay up. Defaults will silently stop all polling:
 - Use docker-compose for local PostgreSQL on port 5432
 - EF Core migrations via dotnet ef
 - Vite dev server proxies /api to .NET backend
-- All dates stored and returned as UTC. Patrol reports carry local times with an offset, so
+- All dates stored as UTC, but the history handed to Claude is rendered in the PROPERTY's
+  local time with a time_zone field, because patrol reports print local times. Passing UTC
+  there makes the model compare a local time in the PDF against a UTC timestamp and invent an
+  offset-sized "anomaly" — it once reported the gate opening 5 hours early when nothing had
+  changed. Patrol reports carry local times with an offset, so
   parse with AdjustToUniversal|AssumeUniversal — relabelling a local time as UTC shifts every
   incident and corrupts the history comparison windows.
 - Migrations run automatically only in Development (DbSeeder). Apply them to production by hand.
