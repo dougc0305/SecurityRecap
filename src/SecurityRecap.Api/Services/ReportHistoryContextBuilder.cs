@@ -19,7 +19,7 @@ public class ReportHistoryContextBuilder
     }
 
     public record IncidentSnapshot(
-        DateTime? IncidentTime,
+        string? IncidentTimeLocal,
         string IncidentType,
         string Severity,
         string? Location,
@@ -27,7 +27,7 @@ public class ReportHistoryContextBuilder
 
     public record TypeCount(string IncidentType, int Last7Days, int Last30Days, int Last90Days);
 
-    public record RepeatAddress(string Address, int IncidentCount, DateTime? LastIncident, int Last30Days);
+    public record RepeatAddress(string Address, int IncidentCount, string? LastIncidentLocal, int Last30Days);
 
     public record KnownVehicle(
         string PlateNumber,
@@ -36,12 +36,18 @@ public class ReportHistoryContextBuilder
         string? Model,
         string? Color,
         int PriorViolationCount,
-        DateTime? FirstSeen,
-        DateTime? LastSeen);
+        string? FirstSeenLocal,
+        string? LastSeenLocal);
 
     public record PropertyHistoryContext(
         string PropertyName,
-        DateTime GeneratedAtUtc,
+        /// <summary>
+        /// The timezone every timestamp below is expressed in. Patrol reports print local
+        /// times, so the history must too — comparing a local time in the PDF against a UTC
+        /// timestamp here manufactures an offset-sized "anomaly" out of nothing.
+        /// </summary>
+        string TimeZone,
+        string GeneratedAtLocal,
         int ReportsOnFile,
         DateOnly? EarliestReportDate,
         DateOnly? LatestReportDate,
@@ -54,6 +60,15 @@ public class ReportHistoryContextBuilder
         IReadOnlyList<KnownVehicle> KnownVehicles,
         IReadOnlyList<IncidentSnapshot> RecentIncidents);
 
+    private static TimeZoneInfo ResolveTimeZone(string id)
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            return TimeZoneInfo.Utc;
+        }
+    }
+
     public async Task<PropertyHistoryContext> BuildAsync(Guid propertyId, CancellationToken ct = default)
     {
         var now = DateTime.UtcNow;
@@ -61,10 +76,21 @@ public class ReportHistoryContextBuilder
         var since30 = now.AddDays(-30);
         var since90 = now.AddDays(-90);
 
-        var propertyName = await _db.Properties
+        var property = await _db.Properties
             .Where(p => p.Id == propertyId)
-            .Select(p => p.Name)
-            .FirstOrDefaultAsync(ct) ?? "Unknown property";
+            .Select(p => new { p.Name, p.Timezone })
+            .FirstOrDefaultAsync(ct);
+
+        var propertyName = property?.Name ?? "Unknown property";
+        var timeZoneId = string.IsNullOrWhiteSpace(property?.Timezone) ? "UTC" : property!.Timezone;
+        var timeZone = ResolveTimeZone(timeZoneId);
+
+        // Everything handed to the model is rendered in the property's local time, because
+        // that is what the patrol report itself prints.
+        string? Local(DateTime? utc) => utc is null
+            ? null
+            : TimeZoneInfo.ConvertTimeFromUtc(
+                DateTime.SpecifyKind(utc.Value, DateTimeKind.Utc), timeZone).ToString("yyyy-MM-dd HH:mm");
 
         // Incidents are timestamped by IncidentTime when the report supplied one, and by
         // CreatedAt otherwise; coalesce so undated incidents still land in a window.
@@ -132,7 +158,7 @@ public class ReportHistoryContextBuilder
             .Select(a => new RepeatAddress(
                 a.Address,
                 a.IncidentCount,
-                a.LastIncident,
+                Local(a.LastIncident),
                 incidents90.Count(i =>
                     i.Location != null
                     && string.Equals(i.Location.Trim(), a.Address, StringComparison.OrdinalIgnoreCase)
@@ -158,18 +184,21 @@ public class ReportHistoryContextBuilder
             .Take(250)
             .Select(v => new KnownVehicle(
                 v.PlateNumber, v.PlateState, v.Make, v.Model, v.Color,
-                v.ViolationCount, v.FirstSeen, v.LastSeen))
+                v.ViolationCount, Local(v.FirstSeen), Local(v.LastSeen)))
             .ToList();
 
         var recent = incidents90
             .OrderByDescending(i => Effective(i.IncidentTime, i.CreatedAt))
             .Take(100)
-            .Select(i => new IncidentSnapshot(i.IncidentTime, i.IncidentType, i.Severity, i.Location, i.Description))
+            .Select(i => new IncidentSnapshot(
+                Local(Effective(i.IncidentTime, i.CreatedAt)),
+                i.IncidentType, i.Severity, i.Location, i.Description))
             .ToList();
 
         return new PropertyHistoryContext(
             propertyName,
-            now,
+            timeZoneId,
+            Local(now)!,
             reportStats?.Count ?? 0,
             reportStats?.Earliest,
             reportStats?.Latest,
