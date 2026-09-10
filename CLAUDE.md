@@ -140,6 +140,10 @@ GET    /api/vehicles/{id}
 ### Chat
 POST   /api/chat  ← { propertyId, message, conversationHistory[] }
 
+### Board Recap
+GET    /api/v1/recap?propertyId=&from=&to=&includeNarrative=
+       Period summary for a board meeting packet. Max 190 days.
+
 ## Claude API — Ingestion Prompt
 Located at: src/SecurityRecap.Api/Prompts/IngestionPrompt.cs
 
@@ -172,6 +176,19 @@ The chat prompt receives:
 - Last 90 days of incidents as structured JSON
 - Aggregated property statistics
 
+## Board Recap
+RecapService computes every figure from the database; RecapPrompt hands those figures to Claude
+and asks only for the reading of them. The model is explicitly told not to recount or infer a
+number — a figure in a board packet has to be exact. A narrative failure returns the figures with
+an error rather than failing the request.
+
+Routine entries (Low-severity Patrol and Gate) are separated from substantive ones everywhere.
+They are logged whether or not anything happened, so counting them as incidents overstates a
+period by roughly an order of magnitude — ~566 of 612 entries in a typical month.
+
+Reports that stored zero entries are excluded from usable coverage and surfaced separately: that
+is a processing failure on our side, not an officer who did no patrols.
+
 ## Frontend Pages
 - /login
 - /dashboard          ← overview, incident counts, recent activity, flags
@@ -179,6 +196,7 @@ The chat prompt receives:
 - /vehicles           ← plate tracker
 - /addresses          ← address watch list
 - /reports            ← archive with PDF download and AI summary view
+- /recap              ← board meeting recap for a date range, printable
 - /chat               ← AI chat interface
 - /settings           ← property and user management
 

@@ -6,6 +6,7 @@ import type {
   ResetPasswordResponse, ChangePasswordRequest,
   ApiKey, CreateApiKeyRequest, CreateApiKeyResponse,
   MailboxIngestConfig, SaveMailboxIngestConfigRequest, MailboxPollResult, MailboxVerifyResult,
+  RecapResult,
 } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5069/api';
@@ -160,6 +161,16 @@ export const ingestApi = {
     formData.append('file', file);
     return api.post<ApiResponse<{ reportId: string }>>('/v1/ingest/report', formData);
   },
+};
+
+// Period recap for board meetings
+export const recapApi = {
+  get: (params: { propertyId: string; from: string; to: string; includeNarrative?: boolean }) =>
+    api.get<ApiResponse<RecapResult>>('/v1/recap', {
+      params,
+      // The narrative is a model call over a whole period; it can take a while.
+      timeout: 300_000,
+    }),
 };
 
 // Mailbox ingest (admin-only)

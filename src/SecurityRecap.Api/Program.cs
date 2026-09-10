@@ -129,6 +129,7 @@ builder.Services.AddScoped<MailboxAlertNotifier>();
 builder.Services.AddScoped<IMailboxIngestionService, MailboxIngestionService>();
 builder.Services.AddHostedService<MailboxPollingBackgroundService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IRecapService, RecapService>();
 builder.Services.AddScoped<IIncidentService, IncidentService>();
 builder.Services.AddScoped<IVehicleService, VehicleService>();
 builder.Services.AddScoped<IAddressOfInterestService, AddressOfInterestService>();

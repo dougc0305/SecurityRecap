@@ -266,3 +266,88 @@ export interface ChatRequest {
 export interface ChatResponse {
   response: string;
 }
+
+export interface OfficerShifts { officer: string; shifts: number }
+
+export interface RecapCoverage {
+  from: string;
+  to: string;
+  nightsInPeriod: number;
+  reportsReceived: number;
+  usableReports: number;
+  missingDates: string[];
+  emptyReportDates: string[];
+  officers: OfficerShifts[];
+  averagePatrolsPerShift: number;
+  minPatrols: number;
+  maxPatrols: number;
+}
+
+export interface RecapCategoryCount {
+  category: string; high: number; medium: number; low: number; total: number;
+}
+
+export interface RecapEntry {
+  reportDate: string;
+  localTime: string | null;
+  incidentType: string;
+  severity: string;
+  location: string | null;
+  description: string;
+}
+
+export interface RecapViolation {
+  reportDate: string;
+  localTime: string | null;
+  plateNumber: string | null;
+  plateState: string | null;
+  vehicle: string | null;
+  location: string | null;
+  violationType: string | null;
+  severity: string;
+  noticeIssued: boolean;
+  towNotified: boolean;
+  plateViolationsAllTime: number;
+  plateFirstSeen: string | null;
+  plateViolationsInPeriod: number;
+}
+
+export interface RecapRecurringItem {
+  description: string; location: string | null; occurrences: number; first: string; last: string;
+}
+
+export interface RecapData {
+  propertyName: string;
+  timeZone: string;
+  coverage: RecapCoverage;
+  totalEntries: number;
+  routineEntries: number;
+  substantiveEntries: number;
+  byCategory: RecapCategoryCount[];
+  substantiveDetail: RecapEntry[];
+  highSeverity: RecapEntry[];
+  violations: RecapViolation[];
+  recurringMaintenance: RecapRecurringItem[];
+  repeatLocations: RecapRecurringItem[];
+}
+
+export interface RecapAttentionItem {
+  title: string;
+  when: string | null;
+  what: string;
+  whyItMatters: string;
+  significance: string;
+}
+
+export interface RecapNarrative {
+  headline: string;
+  attentionItems: RecapAttentionItem[];
+  dataNotes: string[];
+  markdownSummary: string;
+}
+
+export interface RecapResult {
+  data: RecapData;
+  narrative: RecapNarrative | null;
+  narrativeError: string | null;
+}
