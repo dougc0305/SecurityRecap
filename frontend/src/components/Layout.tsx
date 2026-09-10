@@ -2,8 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import {
   LayoutDashboard, AlertTriangle, Car, FileText, MapPin,
-  MessageSquare, Settings, LogOut, Shield
-} from 'lucide-react';
+  MessageSquare, Settings, LogOut, Shield, ClipboardList } from 'lucide-react';
 import './Layout.css';
 import { formatRoleLabel } from '../utils/authorization';
 
@@ -12,6 +11,7 @@ const navItems = [
   { to: '/incidents', label: 'Incidents', icon: AlertTriangle },
   { to: '/vehicles', label: 'Vehicles', icon: Car },
   { to: '/reports', label: 'Reports', icon: FileText },
+  { to: '/recap', label: 'Board Recap', icon: ClipboardList },
   { to: '/addresses', label: 'Addresses', icon: MapPin },
   { to: '/chat', label: 'AI Chat', icon: MessageSquare },
   { to: '/settings', label: 'Settings', icon: Settings },
